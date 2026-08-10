@@ -1,0 +1,3557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#07090e">
+<meta name="description" content="Local body-tracking deck — hand, face and pose tracking plus a J.A.R.V.I.S.-style voice assistant. 100% on-device, nothing leaves the Mac.">
+<title>Local Body Deck</title>
+<style>
+:root {
+  --bg: #07090e;
+  --panel: rgba(16, 21, 31, 0.72);
+  --panel2: rgba(24, 30, 44, 0.6);
+  --border: rgba(148, 178, 214, 0.14);
+  --border-strong: rgba(110, 160, 255, 0.32);
+  --accent: #5aa2ff;
+  --accent2: #37d3a2;
+  --amber: #ffc44d;
+  --danger: #ff6d66;
+  --text: #e9f0fb;
+  --muted: #8b99ad;
+  --radius: 16px;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --glow: 0 0 0 1px rgba(90, 162, 255, 0.18), 0 0 26px rgba(90, 162, 255, 0.10);
+}
+* { box-sizing: border-box; }
+::selection { background: rgba(90, 162, 255, 0.35); color: #fff; }
+* { scrollbar-width: thin; scrollbar-color: rgba(110, 160, 255, 0.35) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: rgba(110, 160, 255, 0.28); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(110, 160, 255, 0.5); }
+*::-webkit-scrollbar-track { background: transparent; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background:
+    radial-gradient(1000px 560px at 85% -10%, rgba(90, 162, 255, 0.10), transparent 60%),
+    radial-gradient(800px 480px at -10% 115%, rgba(55, 211, 162, 0.07), transparent 55%),
+    radial-gradient(700px 420px at 50% 110%, rgba(255, 196, 77, 0.05), transparent 60%),
+    linear-gradient(180deg, #07090e 0%, #0a0e15 60%, #070a10 100%);
+  background-attachment: fixed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 18px 84px;
+}
+.header {
+  width: min(760px, 94vw);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.brand { display: flex; align-items: center; gap: 13px; }
+.logo {
+  width: 42px; height: 42px; border-radius: 12px; flex: 0 0 auto;
+  background: linear-gradient(135deg, #0f2a4a, #0d2f26);
+  border: 1px solid var(--border-strong);
+  display: grid; place-items: center;
+  color: var(--accent);
+  box-shadow: var(--glow);
+}
+.brand h1 { margin: 0; font-size: 19px; letter-spacing: 0.5px; font-weight: 700; }
+.brand .tagline { font-size: 11px; color: var(--muted); margin-top: 2px; letter-spacing: 0.3px; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+  padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel2); color: var(--muted);
+  backdrop-filter: blur(8px); white-space: nowrap;
+}
+.badge.privacy { border-color: rgba(55, 211, 162, 0.35); color: #8ff0cf; }
+.badge.offline { border-color: rgba(255, 196, 77, 0.35); color: #ffe0a1; }
+
+.stage {
+  position: relative;
+  width: min(760px, 94vw);
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  background: #000;
+  box-shadow: var(--shadow);
+  animation: stageIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes stageIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.stage:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stage::after {
+  content: "";
+  position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
+}
+#video, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+#video { opacity: 0; transition: opacity 0.4s; }
+
+.stage-placeholder {
+  position: absolute; inset: 0; z-index: 6;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; text-align: center; padding: 24px;
+  background: radial-gradient(600px 400px at 50% 45%, rgba(90, 162, 255, 0.10), transparent 70%);
+  overflow: hidden;
+}
+.stage-placeholder::after {
+  content: "";
+  position: absolute; left: -40%; right: -40%; top: 0; height: 120px;
+  background: linear-gradient(180deg, transparent, rgba(90, 162, 255, 0.10), transparent);
+  animation: scanline 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes scanline {
+  0% { transform: translateY(-140px); }
+  55% { transform: translateY(calc(100% - 40px)); }
+  100% { transform: translateY(-140px); }
+}
+.stage-placeholder.hide { display: none; }
+.stage-placeholder .glyph {
+  width: 62px; height: 62px; border-radius: 18px;
+  display: grid; place-items: center; font-size: 26px; color: var(--accent);
+  background: linear-gradient(135deg, rgba(90, 162, 255, 0.18), rgba(55, 211, 162, 0.14));
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--glow);
+}
+.stage-placeholder h3 { margin: 4px 0 0; font-size: 17px; font-weight: 600; letter-spacing: 0.3px; }
+.stage-placeholder p { margin: 0 0 4px; font-size: 12.5px; color: var(--muted); max-width: 46ch; line-height: 1.5; }
+.live-badge {
+  display: none;
+  position: absolute; right: 12px; top: 12px; z-index: 6;
+  align-items: center; gap: 7px;
+  font: 600 11px "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.3px; color: #8ff0cf;
+  background: rgba(6, 13, 18, 0.55);
+  border: 1px solid rgba(55, 211, 162, 0.35);
+  padding: 7px 12px; border-radius: 999px;
+  backdrop-filter: blur(6px);
+}
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #3dd3a2; animation: livePulse 1.6s infinite; }
+@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.hud-readout {
+  position: absolute; top: 12px; left: 12px; z-index: 5;
+  font: 11px "SF Mono", Menlo, Consolas, monospace; line-height: 1.7;
+  color: #bfe3ff;
+  background: rgba(4, 8, 16, 0.55);
+  border: 1px solid rgba(90, 162, 255, 0.25);
+  padding: 8px 11px; border-radius: 10px;
+  backdrop-filter: blur(6px); letter-spacing: 0.2px;
+  max-width: calc(100% - 24px);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel { width: min(760px, 94vw); margin-top: 22px; display: flex; flex-direction: column; gap: 12px; }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
+}
+.card-title {
+  margin: 0 0 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+.row { display: flex; align-items: center; gap: 12px; }
+.key-hint { font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.key-hint kbd {
+  font: inherit; font-size: 10px; padding: 2px 7px; border-radius: 5px;
+  border: 1px solid var(--border-strong); border-bottom-width: 2px;
+  background: var(--panel2); color: var(--text);
+}
+.stage-placeholder .key-hint { opacity: 0.8; }
+
+.status-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.status {
+  font-size: 13px; color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.status::before {
+  content: "";
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #e8b32a;
+  box-shadow: 0 0 8px rgba(232, 179, 42, 0.6);
+  flex: 0 0 auto;
+}
+.status.armed::before { background: #37e2a8; box-shadow: 0 0 8px rgba(55, 226, 168, 0.7); }
+.status.busy::before { background: #e8b32a; box-shadow: 0 0 8px rgba(232, 179, 42, 0.6); animation: vfBreath 1.2s infinite; }
+.status.ok::before { background: #5aa2ff; box-shadow: 0 0 8px rgba(90, 162, 255, 0.7); }
+.status.error::before { background: #ff6b6b; box-shadow: 0 0 8px rgba(255, 107, 107, 0.7); }
+.status span { animation: statusIn 0.35s ease; }
+@keyframes statusIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.readout { margin-top: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--text); font-weight: 600; }
+
+#sleepTimerStatus {
+  display: none;
+  font: 600 13px "SF Mono", Menlo, Consolas, monospace;
+  color: var(--amber);
+  background: rgba(255, 196, 77, 0.08);
+  border: 1px solid rgba(255, 196, 77, 0.35);
+  padding: 9px 13px; border-radius: 10px;
+}
+
+.reminders {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+.reminder-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(55, 211, 162, 0.06);
+  border: 1px solid rgba(55, 211, 162, 0.28);
+  border-radius: 10px;
+  padding: 9px 13px;
+  animation: panelIn 0.25s ease both;
+}
+.reminder-chip time {
+  font: 600 12px "SF Mono", Menlo, Consolas, monospace;
+  color: #8ff0cf;
+  white-space: nowrap;
+}
+.reminder-chip .reminder-text {
+  flex: 1;
+  text-transform: capitalize;
+}
+.reminder-chip .reminder-x { padding: 4px 9px; font-size: 12px; line-height: 1; }
+
+.btn {
+  border: none; cursor: pointer; font-weight: 600;
+  position: relative; overflow: hidden;
+  padding: 10px 18px; border-radius: 10px;
+  font-size: 13px; color: #06121f;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 6px 18px rgba(90, 162, 255, 0.28);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.btn:disabled { opacity: 0.45; filter: grayscale(0.5); box-shadow: none; cursor: not-allowed; }
+.btn:disabled::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: btnShimmer 1.6s linear infinite;
+}
+@keyframes btnShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.btn:not(:disabled):active { transform: translateY(1px); }
+.btn:not(:disabled):hover { box-shadow: 0 8px 24px rgba(90, 162, 255, 0.4); }
+.small-btn {
+  border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+  padding: 7px 12px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.small-btn:hover { border-color: var(--border-strong); }
+
+.pills { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+.pills.grow input[type="text"] { flex: 1; min-width: 150px; }
+.tl { position: relative; cursor: pointer; user-select: none; }
+.tl input { position: absolute; opacity: 0; pointer-events: none; }
+.tl span {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; letter-spacing: 0.2px;
+  color: var(--muted);
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  transition: all 0.16s;
+}
+.tl input:checked + span {
+  color: #bfe4ff;
+  background: rgba(90, 162, 255, 0.12);
+  border-color: rgba(90, 162, 255, 0.45);
+  box-shadow: 0 0 14px rgba(90, 162, 255, 0.12);
+}
+.tl input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pills input[type="text"], .sel {
+  background: var(--panel2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: 7px 10px; font-size: 12.5px; min-width: 0;
+}
+.pills input[type="text"]:focus, .sel:focus { border-color: var(--border-strong); outline: none; }
+.sel { font-size: 12.5px; padding: 6px 10px; }
+.hint { font-size: 11px; color: var(--muted); }
+
+.cheatsheet {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel2);
+  padding: 0;
+}
+.cheatsheet summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  padding: 10px 14px;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cheatsheet summary::after {
+  content: "▾";
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.25s ease;
+}
+.cheatsheet[open] summary::after { transform: rotate(180deg); }
+.cheatsheet summary::-webkit-details-marker { display: none; }
+.cheatsheet summary:hover { color: var(--text); }
+.cheatsheet[open] summary { border-bottom: 1px solid var(--border); }
+.cheatsheet .sheet-grid { animation: sheetIn 0.3s ease; }
+@keyframes sheetIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.macros-list { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.macro-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--panel2);
+}
+.macro-phrase {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--accent); font: inherit; font-weight: 600; font-size: 13px;
+  text-align: left; padding: 0; flex: 0 0 auto;
+}
+.macro-phrase:hover { color: var(--text); text-decoration: underline; }
+.macro-desc { flex: 1; font-size: 11px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.macro-form { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+.macro-form input[type="text"] {
+  width: 100%; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: rgba(6, 10, 17, 0.6);
+  color: var(--text); font: inherit; font-size: 13px;
+}
+.macro-form input[type="text"]:focus { outline: none; border-color: var(--border-strong); }
+.macro-step { display: flex; align-items: center; gap: 8px; }
+.macro-step .step-value { flex: 1; min-width: 0; }
+.macro-step .step-remove { flex: 0 0 auto; }
+
+#scanCanvas {
+  width: 100%; aspect-ratio: 1 / 1;
+  background: radial-gradient(circle at 50% 38%, #0b1424 0%, #05070c 72%);
+  border: 1px solid var(--border); border-radius: 12px;
+  cursor: grab; touch-action: none; display: block;
+}
+#scanCanvas:active { cursor: grabbing; }
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2px 14px;
+  padding: 8px 14px;
+}
+.sheet-grid span { font-size: 12px; color: var(--text); opacity: 0.85; padding: 3px 0; }
+.sheet-grid .sheet-cat {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 1;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+}
+.sheet-grid .sheet-note { color: var(--muted, #8b949e); }
+
+.credit {
+  margin-top: 22px;
+  width: min(760px, 94vw);
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  line-height: 1.7;
+}
+.credit a { color: var(--accent); text-decoration: none; }
+.credit a:hover { text-decoration: underline; }
+.credit-sub { color: var(--muted); opacity: 0.6; font-size: 10px; }
+
+.legend {
+  display: flex; flex-wrap: wrap; gap: 8px 14px;
+  font-size: 11.5px; color: var(--muted);
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  backdrop-filter: blur(8px);
+}
+.legend > div { display: inline-flex; align-items: center; gap: 8px; }
+.swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px rgba(255, 255, 255, 0.25); }
+
+/* Viewfinder inner frame on the camera stage — purely decorative. */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  z-index: 3;
+  border: 1px solid rgba(90, 162, 255, 0.14);
+  border-radius: 12px;
+  pointer-events: none;
+}
+.stage::before {
+  box-shadow: 0 0 0 1px rgba(90, 162, 255, 0.06);
+}
+/* Rounded corners on the corners of the viewfinder via gradient "L" shapes */
+.vf {
+  position: absolute;
+  z-index: 4;
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+  border: 2px solid rgba(90, 162, 255, 0.55);
+  filter: drop-shadow(0 0 6px rgba(90, 162, 255, 0.35));
+  transition: border-color 0.3s;
+  animation: vfBreath 4.5s ease-in-out infinite;
+}
+@keyframes vfBreath {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.vf.tl { top: 22px; left: 22px; border-right: none; border-bottom: none; border-top-left-radius: 6px; }
+.vf.tr { top: 22px; right: 22px; border-left: none; border-bottom: none; border-top-right-radius: 6px; }
+.vf.bl { bottom: 22px; left: 22px; border-right: none; border-top: none; border-bottom-left-radius: 6px; }
+.vf.br { bottom: 22px; right: 22px; border-left: none; border-top: none; border-bottom-right-radius: 6px; }
+
+/* Entrance + hover polish on cards and pills */
+.panel { animation: panelIn 0.5s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+@keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.card { transition: transform 0.18s ease, border-color 0.18s ease; }
+.card:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+
+.btn:focus-visible,
+.small-btn:focus-visible,
+.pills input[type="text"]:focus-visible,
+.sel:focus-visible,
+.tl input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .status-row { flex-direction: column; align-items: stretch; }
+  .card { padding: 14px; }
+  .vf { width: 18px; height: 18px; }
+  .vf.tl, .vf.tr { top: 16px; }
+  .vf.tl, .vf.bl { left: 16px; }
+  .vf.tr, .vf.br { right: 16px; }
+  .vf.bl, .vf.br { bottom: 16px; }
+  .stage::before { inset: 10px; }
+}
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">
+    <div class="logo">◈</div>
+    <div>
+      <h1>LOCAL BODY DECK</h1>
+      <div class="tagline">hands · face · pose · voice — all on this Mac</div>
+    </div>
+  </div>
+  <div class="badges">
+    <div class="badge privacy">🔒 Local only · nothing leaves the Mac</div>
+    <div class="badge offline" id="offlineBadge">💾 Loading local models…</div>
+  </div>
+</div>
+
+<div class="stage">
+  <video id="video" autoplay playsinline muted aria-hidden="true"></video>
+  <canvas id="overlay"></canvas>
+  <div class="live-badge" id="liveBadge"><span class="live-dot"></span>LIVE · <span id="liveFps">—</span> fps</div>
+  <i class="vf tl" aria-hidden="true"></i><i class="vf tr" aria-hidden="true"></i><i class="vf bl" aria-hidden="true"></i><i class="vf br" aria-hidden="true"></i>
+  <div class="stage-placeholder" id="stagePlaceholder">
+    <div class="glyph">◈</div>
+    <h3>Camera stays on this machine</h3>
+    <p>Point it at your face — all tracking runs locally and the video never leaves this Mac.</p>
+    <button class="btn" id="btnStageStart" aria-label="Start camera">▶ Start Camera</button>
+    <span class="key-hint">or press <kbd>S</kbd></span>
+  </div>
+  <div class="hud-readout" id="hudReadout" style="display:none;">
+    <div>PERSON: <span id="hudPerson">—</span></div>
+    <div>EXPRESSION: <span id="hudExpr">—</span></div>
+    <div>MESH POINTS: <span id="hudPoints">—</span></div>
+    <div>POS (X/Y): <span id="hudPos">—</span></div>
+    <div>BLINKS: <span id="hudBlinks">0</span> &nbsp; WINKS: <span id="hudWinks">0</span></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="card status-row">
+    <div>
+      <div class="status" id="status" role="status" aria-live="polite">Click start and allow camera access</div>
+      <div class="readout" id="readout"></div>
+    </div>
+    <button id="startBtn" class="btn" disabled aria-label="Start camera">▶ Start Camera</button>
+  </div>
+
+  <div class="status" id="sleepTimerStatus" style="display:none;"></div>
+
+  <div class="reminders" id="remindersPanel" style="display:none;"></div>
+
+  <div class="card">
+    <div class="card-title">Tracking</div>
+    <div class="pills">
+      <label class="tl"><input type="checkbox" id="toggleHand" checked><span>✋ Hand + fingers</span></label>
+      <label class="tl"><input type="checkbox" id="toggleFace" checked><span>🙂 Face structure</span></label>
+      <label class="tl"><input type="checkbox" id="toggleBody" checked><span>🚶 Body pose</span></label>
+      <label class="tl"><input type="checkbox" id="toggleLabels" checked><span>🏷️ Finger labels</span></label>
+      <label class="tl"><input type="checkbox" id="toggleAngles" checked><span>📐 Bend angles</span></label>
+      <label class="tl"><input type="checkbox" id="toggleASL"><span>🖐️ ASL letters</span></label>
+      
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🛰 3D scan</div>
+    <div class="hint">Live 3D reconstruction of your head from the on-device mesh. Drag to orbit · scroll to zoom. Freeze a frame, then save it as a real .OBJ 3D file — everything stays on this Mac.</div>
+    <canvas id="scanCanvas" width="320" height="320"></canvas>
+    <div class="pills" style="margin-top:9px;">
+      <button id="scanFreeze" class="small-btn">Freeze</button>
+      <button id="scanUnfreeze" class="small-btn">Live</button>
+      <button id="scanSave" class="btn">💾 Save .OBJ</button>
+    </div>
+    <div class="hint" id="scanStatus"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Gestures</div>
+    <div class="pills">
+      <label class="tl"><input type="checkbox" id="togglePinchOpen"><span>🤏 Pinch opens →</span></label>
+      <input type="text" id="pinchUrl" placeholder="https://example.com">
+      <select id="pinchOpenMode" class="sel">
+        <option value="sametab" selected>This tab (always works)</option>
+        <option value="newtab">New tab (may get popup-blocked)</option>
+      </select>
+    </div>
+    <div class="pills" id="electronToggles" style="display:none; margin-top:9px;">
+      <label class="tl"><input type="checkbox" id="toggleBrightnessPinch"><span>🔅 Pinch dims real screen brightness</span></label>
+      <span class="hint">— local server running, real OS control unlocked</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Jarvis voice assistant</div>
+    <div class="pills" id="voiceToggles" style="display:none;">
+      <label class="tl"><input type="checkbox" id="toggleVoice"><span>🎤 Voice control</span></label>
+      <span class="status" id="voiceStatus">Off</span>
+    </div>
+    <div class="pills" id="voicePicker" style="display:none; margin-top:9px;">
+      <label for="voiceSelect" class="hint">Voice:</label>
+      <select id="voiceSelect" class="sel"></select>
+      <button id="voiceTestBtn" class="small-btn">Test</button>
+      <span class="hint">Install more in System Settings → Accessibility → Spoken Content</span>
+    </div>
+    <details class="cheatsheet" id="voiceCheatSheet">
+      <summary>🗒 Try saying…</summary>
+      <div class="sheet-grid">
+        <span class="sheet-cat">Wake / sleep</span>
+        <span>“Hello Jarvis” — activate</span>
+        <span>“disable Jarvis” / “goodbye Jarvis” — turn off</span>
+        <span class="sheet-cat">Greetings &amp; conversation</span>
+        <span>“good morning” / “good afternoon” / “good evening” / “good night”</span>
+        <span>“how are you”</span>
+        <span>“tell me a joke”</span>
+        <span>“what can you do” / “help” / “commands” — opens this list</span>
+        <span class="sheet-cat">Time, date &amp; info</span>
+        <span>“what time is it”</span>
+        <span>“time in London” / “what time in Tokyo”</span>
+        <span>“what's the date” / “what day is it”</span>
+        <span>“what's my ip” — local network address</span>
+        <span>“battery” / “how much disk space is left”</span>
+        <span class="sheet-cat">Volume &amp; brightness</span>
+        <span>“set volume to 50 percent”</span>
+        <span>“volume up” / “volume down”</span>
+        <span>“increase brightness by 10”</span>
+        <span>“volume” / “brightness” → hand-height mode</span>
+        <span class="sheet-cat">Apps</span>
+        <span>“open Safari” / “open opencode” / “open spotify”</span>
+        <span class="sheet-cat">Sleep, screen &amp; security</span>
+        <span>“sleep in 10 minutes” → screen off countdown</span>
+        <span>“stop the sleep timer”</span>
+        <span>“sleep the screen” / “screen off”</span>
+        <span>“put the computer to sleep”</span>
+        <span>“lock my screen”</span>
+        <span class="sheet-cat">Reminders &amp; timers</span>
+        <span>“remind me in 5 minutes to stretch”</span>
+        <span>“cancel reminders”</span>
+        <span class="sheet-cat">Math &amp; conversions</span>
+        <span>“what's 36% of 2400” / “50 plus 30”</span>
+        <span>“how many miles is 5 km”</span>
+        <span class="sheet-cat">Fun</span>
+        <span>“flip a coin” / “heads or tails”</span>
+        <span>“roll a dice”</span>
+        <span class="sheet-cat">Music &amp; video</span>
+        <span>“pause spotify” / “play” / “next track” / “previous”</span>
+        <span>“play my liked songs” / “play playlist …”</span>
+        <span>“pause youtube” / “skip” / “previous song”</span>
+        <span class="sheet-cat">Messaging</span>
+        <span>“go to whatsapp and text John I'm late”</span>
+        <span>“text Mom see you soon” — sent via Messages</span>
+        <span class="sheet-cat">Voice macros</span>
+        <span>“party time” — Spotify, volume 100, Liked Songs</span>
+        <span>“goodnight jarvis” / edit any macro below ↓</span>
+        <span class="sheet-cat">Camera gestures</span>
+        <span>✊ Hold right fist → lock screen</span>
+        <span>👊👊 Both fists → skeleton-only mode</span>
+        <span>🤟 Web-slinger sign → mask on face</span>
+        <span>🤏 Pinch → open the URL you typed</span>
+        <span>🖐️ Hold an ASL letter → spell words</span>
+        <span>“what's my progress”</span>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🗣 Voice macros</div>
+    <div class="hint">Say a phrase and its steps fire in order — macros run before everything else. A starter set is pre-loaded; click a phrase to edit it, or add your own.</div>
+    <div id="macrosList" class="macros-list"></div>
+    <details class="cheatsheet" id="macroEditor">
+      <summary>➕ Add / edit a macro</summary>
+      <div class="macro-form">
+        <input type="text" id="macroPhrase" placeholder="Phrase — e.g. “goodnight jarvis”" maxlength="60">
+        <div id="macroSteps"></div>
+        <div class="pills">
+          <button id="macroAddStep" class="small-btn">+ Add step</button>
+        </div>
+        <div class="pills" style="margin-top:9px;">
+          <button id="macroSave" class="btn">Save macro</button>
+          <button id="macroCancel" class="small-btn">Cancel</button>
+        </div>
+        <div class="hint" id="macroStatus"></div>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Wellbeing</div>
+    <div class="pills">
+      <label class="tl"><input type="checkbox" id="toggleWellbeing"><span>🧘 Posture + blink reminders</span></label>
+      <span class="status" id="wellbeingStatus">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Keyboards &amp; spelling</div>
+    <div class="row" id="spellingPanel" style="display:none; align-items:flex-start;">
+      <div>
+        <div class="status">Hold a letter shape steady to spell — pause or drop your hand to finish the word</div>
+        <div class="readout" style="margin-top:8px;">Spelling: <b id="spellingCurrent">&nbsp;</b></div>
+        <div class="readout">Words: <span id="spellingWords" style="color:var(--text);">—</span></div>
+      </div>
+      <button class="small-btn" id="clearWordsBtn">Clear Words</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><span class="swatch" style="background:#f0d000"></span>Thumb</div>
+    <div><span class="swatch" style="background:#f85149"></span>Index</div>
+    <div><span class="swatch" style="background:#3fb950"></span>Middle</div>
+    <div><span class="swatch" style="background:#58a6ff"></span>Ring</div>
+    <div><span class="swatch" style="background:#bc6ff1"></span>Pinky</div>
+    <div><span class="swatch" style="background:#ff9d4d"></span>Face contours (eyes/brows/lips/jaw)</div>
+    <div><span class="swatch" style="background:#f5d100"></span>Face scan box (color = expression)</div>
+    <div><span class="swatch" style="background:#8b949e"></span>Body pose (up to 2 people)</div>
+    <div>📐 Elbow + knee angles labeled live</div>
+    <div>👀 Blinks + winks counted in the face HUD</div>
+    <div>🟩 Green bar under wrist = pinch %</div>
+    <div>🤟 Web-slinger sign → mask on face</div>
+    <div>👊👊 Both fists → skeleton-only mode</div>
+    <div>✊ Right fist (held) → locks your screen</div>
+    <div>🗣️ Mac speaks back when voice mode activates</div>
+  </div>
+</div>
+
+<div class="credit">Runs entirely on this Mac — no uploads, no accounts. MediaPipe models vendored locally, zero cloud.<br><span class="credit-sub">Local deck v6 · Aug 2026 · camera feed never leaves localhost</span></div>
+
+<script type="module">
+import {
+  HandLandmarker,
+  FaceLandmarker,
+  PoseLandmarker,
+  FilesetResolver,
+  DrawingUtils
+} from "./vendor/vision_bundle.mjs";
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+const drawingUtils = new DrawingUtils(ctx);
+const statusEl = document.getElementById("status");
+const readoutEl = document.getElementById("readout");
+const startBtn = document.getElementById("startBtn");
+function setStatus(text, mode) {
+  statusEl.classList.remove("armed", "busy", "ok", "error");
+  if (mode) statusEl.classList.add(mode);
+  statusEl.innerHTML = "";
+  const s = document.createElement("span");
+  s.textContent = text;
+  statusEl.appendChild(s);
+}
+const offlineBadge = document.getElementById("offlineBadge");
+
+const toggleHand = document.getElementById("toggleHand");
+const toggleFace = document.getElementById("toggleFace");
+const toggleBody = document.getElementById("toggleBody");
+const toggleLabels = document.getElementById("toggleLabels");
+const toggleAngles = document.getElementById("toggleAngles");
+const toggleASL = document.getElementById("toggleASL");
+const toggleWellbeing = document.getElementById("toggleWellbeing");
+const wellbeingStatus = document.getElementById("wellbeingStatus");
+const togglePinchOpen = document.getElementById("togglePinchOpen");
+const pinchUrlInput = document.getElementById("pinchUrl");
+const pinchOpenModeSelect = document.getElementById("pinchOpenMode");
+const electronToggles = document.getElementById("electronToggles");
+const toggleBrightnessPinch = document.getElementById("toggleBrightnessPinch");
+const voicePicker = document.getElementById("voicePicker");
+const voiceToggles = document.getElementById("voiceToggles");
+const toggleVoice = document.getElementById("toggleVoice");
+const voiceStatus = document.getElementById("voiceStatus");
+const voiceSelect = document.getElementById("voiceSelect");
+const voiceTestBtn = document.getElementById("voiceTestBtn");
+let currentVoice = null; // null = server default ("Daniel" if installed)
+
+// Feature-detect: this file also runs as a plain browser page (opened directly,
+// no server) — in that case the /api endpoints won't exist. Only show the
+// local-server-dependent controls when the local server is actually running.
+// Voice + lock use their own endpoints (they work even if the old `brightness`
+// package can't read this Mac's display), so the /api/health check, not
+// /api/brightness, decides what unlocks.
+let localServerAvailable = false;
+fetch("/api/health").then(r => r.ok ? r.json() : Promise.reject(new Error("bad status"))).then(health => {
+  localServerAvailable = true;
+  voiceToggles.style.display = "flex"; // voice-controlled volume needs the local server
+  voicePicker.style.display = "flex";
+  loadVoiceList(); // populate the voice picker from `say -v '?'`
+  if (health.brightness) electronToggles.style.display = "flex"; // real brightness only where the module works
+}).catch(() => { /* no local server — just a plain file, that's fine */ });
+
+const spellingPanel = document.getElementById("spellingPanel");
+const spellingCurrent = document.getElementById("spellingCurrent");
+const spellingWords = document.getElementById("spellingWords");
+const clearWordsBtn = document.getElementById("clearWordsBtn");
+const hudReadout = document.getElementById("hudReadout");
+const hudPerson = document.getElementById("hudPerson");
+const hudExpr = document.getElementById("hudExpr");
+const hudPoints = document.getElementById("hudPoints");
+const hudPos = document.getElementById("hudPos");
+const hudBlinks = document.getElementById("hudBlinks");
+const hudWinks = document.getElementById("hudWinks");
+const stagePlaceholder = document.getElementById("stagePlaceholder");
+const liveBadge = document.getElementById("liveBadge");
+const btnStageStart = document.getElementById("btnStageStart");
+
+// Persist non-camera settings so choices (voice, tracking layers, wellness, etc.)
+// survive a reload. Everything is read live each frame, so restoring ahead of
+// the first draw is safe.
+const PERSIST_TOGGLES = [
+  "toggleHand", "toggleFace", "toggleBody", "toggleLabels", "toggleAngles",
+  "toggleASL", "togglePinchOpen", "toggleBrightnessPinch", "toggleVoice", "toggleWellbeing"
+];
+PERSIST_TOGGLES.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const saved = localStorage.getItem("deck-toggle-" + id);
+  if (saved !== null) el.checked = saved === "1";
+  el.addEventListener("change", () => {
+    localStorage.setItem("deck-toggle-" + id, el.checked ? "1" : "0");
+  });
+});
+
+// Everything below is served from THIS machine — no Google/MediaPipe downloads,
+// even on a completely fresh browser profile. Fully offline by design.
+const HAND_MODEL_URL = "/models/hand_landmarker.task";
+const FACE_MODEL_URL = "/models/face_landmarker.task";
+const POSE_MODEL_URL = "/models/pose_landmarker_lite.task";
+const DB_NAME = "gesture-app-cache";
+const STORE_NAME = "models";
+
+let handLandmarker = null;
+let faceLandmarker = null;
+let poseLandmarker = null;
+let running = false;
+let lastVideoTime = -1;
+let fpsFrames = 0;
+let pinchWasActive = false;
+let lastPinchOpenTime = 0;
+const PINCH_OPEN_COOLDOWN_MS = 1500;
+
+function checkPinchOpen(lm, now) {
+  const handScale = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y, (lm[9].z || 0) - (lm[0].z || 0));
+  const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y, (lm[4].z || 0) - (lm[8].z || 0));
+  const isPinching = handScale > 0 && pinchDist / handScale < 0.4; // loosened so it triggers more easily
+
+  if (togglePinchOpen.checked && isPinching && !pinchWasActive && now - lastPinchOpenTime > PINCH_OPEN_COOLDOWN_MS) {
+    const url = (pinchUrlInput.value || "").trim();
+    if (url) {
+      lastPinchOpenTime = now;
+      const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+      if (pinchOpenModeSelect.value === "sametab") {
+        window.location.href = fullUrl; // reliable — not subject to popup blocking, but leaves this page
+      } else {
+        window.open(fullUrl, "_blank"); // may be silently blocked — this call isn't from a direct click,
+                                         // which most browsers require to allow window.open
+      }
+    }
+  }
+  pinchWasActive = isPinching;
+}
+
+// ---------- Real screen brightness (via the local Node server, not Electron) ----------
+let brightnessPinchWasActive = false;
+let lastBrightnessPinchTime = 0;
+let originalBrightness = null;
+let isDimmed = false;
+const BRIGHTNESS_PINCH_COOLDOWN_MS = 1500;
+const DIMMED_BRIGHTNESS = 0.15;
+
+async function getRealBrightness() {
+  const resp = await fetch("/api/brightness");
+  if (!resp.ok) throw new Error("brightness endpoint unavailable");
+  const data = await resp.json();
+  return data.level;
+}
+
+async function setRealBrightness(value) {
+  const resp = await fetch("/api/brightness", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value })
+  });
+  if (!resp.ok) throw new Error("failed to set brightness");
+}
+
+// ---------- Mac speaks back (uses macOS's built-in `say` command via the local server) ----------
+
+// When the Mac speaks, the microphone hears it and the recognizer transcribes
+// it as a new command, which would trigger the same action again → an infinite
+// repeat loop ("set volume to 30 percent" → speaks "volume set to 30 percent"
+// → mic hears it → sets it again…). While Jarvis is talking, ignore any
+// incoming command-shaped utterance.
+let speakSuppressUntil = 0;
+const SPEAK_SUPPRESS_MS = 3500;
+
+function looksLikeCommand(t) {
+  return /\b(volume|brightness|jarvis|percent|battery|time|disk|screen|display|open|sleep|hello)\b/.test(t)
+    || hasNumberWord(t) || /\d/.test(t);
+}
+
+// Fill the voice dropdown from the server's `say -v '?'` listing so the user
+// can browse, preview, and pick any installed voice.
+async function loadVoiceList() {
+  try {
+    const resp = await fetch("/api/voices");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    voiceSelect.innerHTML = "";
+    // v2 storage key: any voice saved by an older version is ignored, so Jarvis
+    // returns to his default British voice (Daniel) unless the user re-picks one.
+    const saved = localStorage.getItem("jarvis-voice-v2") || null;
+    const defaultVoice = (data.default && typeof data.default === "string") ? data.default : "";
+    const prefill = (saved && saved) || defaultVoice || "";
+    const defaultEntry = { name: "", label: "(Default — J.A.R.V.I.S.)" };
+    const option = (name, label, selected) => {
+      const o = document.createElement("option");
+      o.value = name; o.textContent = label; o.selected = !!selected;
+      voiceSelect.appendChild(o);
+    };
+    option("", defaultEntry.label, !prefill);
+    for (const v of data.voices) {
+      const label = `${v.name} — ${v.sample}`;
+      option(v.name, label, v.name === prefill);
+    }
+    currentVoice = prefill;
+    voiceSelect.addEventListener("change", () => {
+      currentVoice = voiceSelect.value;
+      localStorage.setItem("jarvis-voice-v2", currentVoice);
+    });
+    voiceTestBtn.addEventListener("click", () => {
+      speak(`Hello sir. How can I help you? Hello sir. How can I help you?`);
+    });
+  } catch (e) {
+    console.warn("Could not load voices:", e);
+  }
+}
+
+async function speak(text) {
+  if (!localServerAvailable) return;
+  speakSuppressUntil = performance.now() + SPEAK_SUPPRESS_MS;
+  try {
+    await fetch("/api/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentVoice ? { text, voice: currentVoice } : { text })
+    });
+  } catch (e) {
+    console.warn("Speak failed:", e);
+  }
+}
+
+async function toggleRealBrightness() {
+  if (!localServerAvailable) return;
+  try {
+    if (!isDimmed) {
+      originalBrightness = await getRealBrightness();
+      await setRealBrightness(DIMMED_BRIGHTNESS);
+      isDimmed = true;
+    } else {
+      await setRealBrightness(originalBrightness != null ? originalBrightness : 1);
+      isDimmed = false;
+    }
+  } catch (e) {
+    console.warn("Brightness control failed:", e);
+  }
+}
+
+function checkBrightnessPinch(lm, now) {
+  if (!localServerAvailable || !toggleBrightnessPinch.checked) {
+    brightnessPinchWasActive = false;
+    return;
+  }
+  const handScale = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y, (lm[9].z || 0) - (lm[0].z || 0));
+  const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y, (lm[4].z || 0) - (lm[8].z || 0));
+  const isPinching = handScale > 0 && pinchDist / handScale < 0.4;
+
+  if (isPinching && !brightnessPinchWasActive && now - lastBrightnessPinchTime > BRIGHTNESS_PINCH_COOLDOWN_MS) {
+    lastBrightnessPinchTime = now;
+    toggleRealBrightness();
+  }
+  brightnessPinchWasActive = isPinching;
+}
+
+// ---------- Voice control → hand-height volume / brightness ----------
+// Say "volume" or "brightness", then for a few seconds your hand's height
+// (up/down) directly sets that real OS value. Uses the browser's
+// SpeechRecognition — requests on-device processing where the browser
+// supports it, but on most setups (Chrome, Safari by default) this sends
+// audio to Google's or Apple's servers for transcription. That's a real
+// trade-off, not something this code can fully control — see the README
+// for how to check what your specific browser is actually doing.
+let speechRecognizer = null;
+let speechUseNetworkFallback = false; // set when the browser lacks an on-device English model
+const VOICE_GESTURE_WINDOW_MS = 8000;
+const VOICE_SEND_INTERVAL_MS = 150;
+
+let volumeGestureModeUntil = 0;
+let lastVolumeSendTime = 0;
+let lastSentVolumeLevel = null;
+
+let brightnessGestureModeUntil = 0;
+let lastBrightnessSendTime = 0;
+let lastSentBrightnessLevel = null;
+
+// Whether Jarvis currently accepts voice commands. Turned on/off by saying
+// "hello Jarvis" / "disable Jarvis" (the recognizer itself keeps listening
+// the whole time the Voice toggle is enabled).
+let voiceCommandActive = false;
+
+// Local on-device speech (Swift helper) vs browser SpeechRecognition fallback.
+let voiceUseLocal = false;
+let voiceFallbackTried = false;
+let localSpeechTimer = null;
+let localSpeechSeq = 0;
+
+const NUM_WORDS = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+
+// Converts spoken number words ("fifty percent", "twenty five") to digits so
+// the directive parser can work with what speech recognition actually returns.
+// "twenty five" is combined into 25, not left as "20 5".
+const NUM_TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const NUM_UNITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const WORD_RE = /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/g;
+// Same alternation without /g — a global regex's .test() is stateful (it
+// advances lastIndex), which made hasNumberWord intermittently return false
+// for short strings after a longer one had been tested.
+const NUMBER_WORD_RE = /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/;
+
+function expandNumberWords(s) {
+  return s
+    .replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\s+(one|two|three|four|five|six|seven|eight|nine)\b/g,
+      (_, t, u) => String(NUM_TENS[t] + NUM_UNITS[u]))
+    .replace(WORD_RE, w => String(NUM_WORDS[w]));
+}
+
+function hasNumberWord(s) {
+  return NUMBER_WORD_RE.test(s);
+}
+
+// Parses something like "set volume to 50 percent", "increase brightness by
+// 20 percent", "dim brightness", "volume 30" into a directive.
+function parseVoiceDirective(raw) {
+  const t = expandNumberWords(raw.replace(/\s+/g, " ").trim().toLowerCase());
+  const target = /\bbrightness\b/.test(t) ? "brightness"
+               : /\bvolume\b/.test(t) ? "volume"
+               : null;
+  if (!target) return null;
+
+  const inc = /\b(increase|raise|brighten|turn up|turn up the|level up|more|louder|brighter|up)\b/.test(t);
+  const dec = /\b(decrease|reduce|dim|turn down|turn down the|lower|quieter|darker|less|down)\b/.test(t);
+  const numMatch = t.match(/\b(\d{1,3})\s*(?:percent|%)?/);
+  const hasNumber = !!numMatch;
+  const value = hasNumber ? parseInt(numMatch[1], 10) : null;
+  const absolute = /\b(to|set|at)\b/.test(t) || (!inc && !dec);
+
+  let mode;
+  if (absolute && !value) return null;
+  if (absolute) mode = "set";
+  else if (inc) mode = "increase";
+  else if (dec) mode = "decrease";
+  else return null;
+
+  return { target, mode, value };
+}
+
+async function getCurrentLevel(target) {
+  try {
+    if (target === "volume") {
+      const r = await fetch("/api/volume");
+      const d = await r.json();
+      return d.level;
+    }
+    const level = await getRealBrightness(); // 0..1
+    return Math.round(level * 100);
+  } catch (e) {
+    return null; // can't read current — only "set to X" or an absolute default will work
+  }
+}
+
+async function applyVoiceDirective(d) {
+  const { target, mode, value } = d;
+  const DEFAULT_STEP = 10; // just "increase volume" with no number, step this much
+
+  let newLevel;
+  if (mode === "set") {
+    newLevel = value;
+  } else {
+    const current = await getCurrentLevel(target);
+    const base = current != null ? current : 50; // guess 50 if we can't read it, so relative commands still do something
+    const delta = (value != null ? value : DEFAULT_STEP) * (mode === "increase" ? 1 : -1);
+    newLevel = base + delta;
+  }
+  newLevel = Math.max(0, Math.min(100, Math.round(newLevel)));
+
+  if (target === "volume") {
+    voiceStatus.textContent = `Setting volume to ${newLevel}%`;
+    try {
+      await fetch("/api/volume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: newLevel })
+      });
+    } catch (e) {
+      console.warn("Volume control failed:", e);
+    }
+    speak(`Volume set to ${newLevel} percent`);
+  } else {
+    voiceStatus.textContent = `Setting brightness to ${newLevel}%`;
+    try {
+      await setRealBrightness(newLevel / 100);
+      speak(`Brightness set to ${newLevel} percent`);
+    } catch (e) {
+      console.warn("Brightness control failed:", e);
+      voiceStatus.textContent = "Couldn't change brightness — this Mac's display isn't supported by the brightness module";
+    }
+  }
+}
+
+function setupVoiceRecognition() {
+  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionClass) {
+    voiceStatus.textContent = "Not supported in this browser";
+    return null;
+  }
+  const recognizer = new SpeechRecognitionClass();
+  recognizer.continuous = true;
+  recognizer.interimResults = false;
+  recognizer.lang = "en-US"; // default to English; change this string if you want another language
+  if (!speechUseNetworkFallback) {
+    // On-device processing keeps audio local where the OS supports it, but
+    // unless the browser has an English on-device model installed, Chrome
+    // aborts with "language-not-supported". When that happens we fall back
+    // (see recognizer.onerror below) to the browser's network speech
+    // service so voice control still functions.
+    try { recognizer.processLocally = true; } catch (e) { /* not supported everywhere, harmless if ignored */ }
+  }
+
+  recognizer.onresult = (event) => {
+    const last = event.results[event.results.length - 1];
+    handleSpeechText(last[0].transcript);
+  };
+  recognizer.onerror = (event) => {
+    console.warn("Speech recognition error:", event.error);
+    if (event.error === "language-not-supported" && !speechUseNetworkFallback) {
+      // No on-device English model — rebuild once without processLocally so
+      // the browser's own (network-backed) English recognition is used.
+      speechUseNetworkFallback = true;
+      voiceStatus.textContent = "English not available on-device — using the browser's online speech service";
+      speechRecognizer = null;
+      if (toggleVoice.checked) {
+        speechRecognizer = setupVoiceRecognition();
+        if (speechRecognizer) {
+          try { speechRecognizer.start(); } catch (e) { /* already starting, ignore */ }
+        }
+      }
+    } else {
+      voiceStatus.textContent = "Error: " + event.error;
+    }
+  };
+  recognizer.onend = () => {
+    // browsers auto-stop SpeechRecognition after periods of silence — restart if still enabled
+    if (toggleVoice.checked) {
+      try { recognizer.start(); } catch (e) { /* already starting, ignore */ }
+    }
+  };
+  return recognizer;
+}
+
+toggleVoice.addEventListener("change", () => {
+  if (toggleVoice.checked) {
+    voiceCommandActive = false;
+    voiceStatus.textContent = "Starting Jarvis voice…";
+    startVoiceAssistant();
+  } else {
+    stopVoiceAssistant();
+    voiceStatus.textContent = "Off";
+    voiceCommandActive = false;
+    volumeGestureModeUntil = 0;
+    brightnessGestureModeUntil = 0;
+  }
+});
+
+// ---------- Assistant startup: local on-device speech first, browser fallback ----------
+async function startVoiceAssistant() {
+  if (!localServerAvailable) { startBrowserSpeech(); return; }
+  try {
+    const r = await fetch("/api/voice/start", { method: "POST" });
+    const d = await r.json();
+    if (d && d.ok) {
+      voiceUseLocal = true;
+      voiceFallbackTried = false;
+      localSpeechSeq = 0;
+      if (localSpeechTimer) clearInterval(localSpeechTimer);
+      localSpeechTimer = setInterval(pollLocalSpeech, 400);
+      voiceStatus.textContent = 'Local voice on — say "Hello Jarvis" to activate';
+      return;
+    }
+  } catch (e) { /* fall through to browser speech */ }
+
+  voiceUseLocal = false;
+  startBrowserSpeech();
+}
+
+async function pollLocalSpeech() {
+  if (!voiceUseLocal || !localServerAvailable) return;
+  try {
+    const r = await fetch(`/api/voice/poll?seq=${localSpeechSeq}`);
+    if (!r.ok) throw new Error("poll failed");
+    const d = await r.json();
+    if (d.error || d.running === false) {
+      clearInterval(localSpeechTimer);
+      localSpeechTimer = null;
+      voiceUseLocal = false;
+      if (!voiceFallbackTried) {
+        voiceFallbackTried = true;
+        voiceStatus.textContent = "Local speech unavailable (" + (d.error || "stopped") + ") — using browser voice";
+        startBrowserSpeech();
+      } else {
+        voiceStatus.textContent = "Voice engine stopped";
+      }
+      return;
+    }
+    if (d.lines && d.lines.length) {
+      d.lines.forEach(line => handleSpeechText(line));
+    }
+    localSpeechSeq = d.seq;
+  } catch (e) { /* network hiccup, try again next tick */ }
+}
+
+function startBrowserSpeech() {
+  if (!speechRecognizer) speechRecognizer = setupVoiceRecognition();
+  if (speechRecognizer) {
+    try {
+      speechRecognizer.start();
+      voiceCommandActive = false;
+      voiceStatus.textContent = 'Voice on — say "Hello Jarvis" to activate';
+    } catch (e) {
+      console.warn("Could not start speech recognition:", e);
+    }
+  }
+}
+
+async function stopVoiceAssistant() {
+  if (voiceUseLocal) {
+    try { await fetch("/api/voice/stop", { method: "POST" }); } catch (e) { /* ignore */ }
+    if (localSpeechTimer) { clearInterval(localSpeechTimer); localSpeechTimer = null; }
+    voiceUseLocal = false;
+  }
+  if (speechRecognizer) {
+    try { speechRecognizer.stop(); } catch (e) { /* ignore */ }
+    speechRecognizer = null;
+  }
+}
+
+// ---------- Command interpretation (shared by local speech + browser speech) ----------
+
+// Speech recognition frequently mangles app names ("opencode" → "open card").
+// Normalise them: explicit aliases first, then fuzzy-match against known apps,
+// so a misheard name still opens the right thing. Raw names pass through for
+// the OS to try.
+function levenshtein(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+const KNOWN_APPS = [
+  "opencode", "Visual Studio Code", "Safari", "Chrome", "Firefox", "Finder",
+  "Terminal", "Spotify", "Notes", "Messages", "Calendar", "Mail", "Photos",
+  "Music", "Calculator", "Maps", "System Settings", "Preview", "Slack", "Zoom",
+  "Discord", "Microsoft Word", "Microsoft Excel", "Microsoft PowerPoint"
+];
+
+function normalizeAppName(raw) {
+  const q = raw.toLowerCase().trim().replace(/^(please\s+|the\s+)/, "");
+  if (!q) return raw;
+  // exact alias wins, including the most common mishearings of opencode
+  const exact = {
+    "open code": "opencode", "opencode": "opencode", "open card": "opencode",
+    "opencod": "opencode", "open cold": "opencode", "card": "opencode",
+    "vs code": "Visual Studio Code", "vscode": "Visual Studio Code",
+    "google chrome": "Chrome", "chrome": "Chrome", "firefox": "Firefox",
+    "word": "Microsoft Word", "excel": "Microsoft Excel", "powerpoint": "Microsoft PowerPoint",
+    "settings": "System Settings", "system settings": "System Settings", "setting": "System Settings",
+    "terminal": "Terminal", "finder": "Finder", "find": "Finder",
+    "messages": "Messages", "message": "Messages", "notes": "Notes", "mail": "Mail",
+    "calendar": "Calendar", "photos": "Photos", "music": "Music", "spotify": "Spotify",
+    "maps": "Maps", "safari": "Safari", "preview": "Preview", "calculator": "Calculator",
+    "slack": "Slack", "zoom": "Zoom", "discord": "Discord"
+  };
+  if (exact[q]) return exact[q];
+  // fuzzy best match; accept when close enough
+  let best = null, bestDist = Infinity;
+  for (const name of KNOWN_APPS) {
+    const d = levenshtein(q, name.toLowerCase());
+    if (d < bestDist) { bestDist = d; best = name; }
+  }
+  const threshold = Math.max(2, Math.floor(q.length / 3) + 1);
+  return best && bestDist <= threshold ? best : raw;
+}
+
+// Local on-device recognition and Chrome's continuous recognizer can deliver
+// the same final utterance more than once; dedupe consecutive repeats so a
+// command like "set volume to 30 percent" only ever executes once.
+const lastHandled = { text: "", at: 0 };
+const LAST_HANDLED_WINDOW_MS = 4000;
+
+async function handleSpeechText(transcript) {
+  const t = transcript.replace(/\s+/g, " ").trim().toLowerCase();
+  if (!t) return;
+  const nowTs = performance.now();
+  if (t === lastHandled.text && nowTs - lastHandled.at < LAST_HANDLED_WINDOW_MS) return;
+  lastHandled.text = t;
+  lastHandled.at = nowTs;
+
+  // Wake word: "hello Jarvis" → commands on.
+  if (/\b(hello|hey|hi|howdy|ok|okay|good)\s+jarvis\b/.test(t) || /\bjarvis\s+(activate|start|listen|wake)\b/.test(t)) {
+    voiceCommandActive = true;
+    voiceStatus.textContent = 'Jarvis active — try "set volume to 50 percent", "what time is it", "open Safari"';
+    speak("Hello sir. How can I help you?");
+    return;
+  }
+  // Sleep word: "disable Jarvis" → commands off.
+  if (/\b(disable|stop|turn off|shut down|shut off|exit|deactivate|goodbye)\s+jarvis\b/.test(t) || /\bjarvis\s+(off|stop|sleep|exit)\b/.test(t)) {
+    voiceCommandActive = false;
+    volumeGestureModeUntil = 0;
+    brightnessGestureModeUntil = 0;
+    voiceStatus.textContent = 'Jarvis disabled — say "Hello Jarvis" to wake up again';
+    speak("Jarvis disabled");
+    return;
+  }
+
+  // Wake and sleep are handled above so they always work, even if Jarvis is
+  // still talking. Everything else is ignored while we are speaking — the mic
+  // hears our own TTS reply as a "new command", which is what made "set volume
+  // to 30 percent" repeat forever.
+  if (nowTs < speakSuppressUntil && looksLikeCommand(t)) return;
+
+  if (!voiceCommandActive) return;
+
+  // Custom voice macros run before any built-in handling.
+  const macro = findMacro(t);
+  if (macro) { runMacro(macro); return; }
+
+  // Cancel a pending sleep timer: "cancel the sleep timer" / "stop sleep timer".
+  if (/\b(cancel|stop|clear|abort)\b.*\b(sleep|timer|shutdown)\b/.test(t) || /\b(sleep|timer)\b.*\b(cancel|stop|clear|abort)\b/.test(t)) {
+    cancelSleepTimer(false);
+    return;
+  }
+
+  // Timed sleep: "sleep in 10 minutes" → screen off after a countdown.
+  const sleepDelay = parseSleepTimer(t);
+  if (sleepDelay !== null) {
+    startSleepTimer(sleepDelay);
+    return;
+  }
+
+  // Screen sleep (display off via pmset — not UI automation).
+  if (/\b(screen|display)\s*(sleep|off)\b/.test(t) || /\bsleep\s+(the\s+)?(screen|display)\b/.test(t)) {
+    screenSleep();
+    return;
+  }
+
+  // Reminders / short timers: "remind me in 10 minutes to stretch".
+  if (/\b(cancel|clear|dismiss|stop)\b.*\breminders?\b/.test(t) || /\breminders?\b.*\b(cancel|clear|dismiss)\b/.test(t)) {
+    clearReminders();
+    return;
+  }
+  const reminder = parseReminder(t);
+  if (reminder !== null) {
+    startReminder(reminder.seconds, reminder.text);
+    return;
+  }
+
+  // Full computer sleep ("put the computer to sleep") — real `pmset sleepnow`.
+  if (/\bput\s+(the\s+)?(computer|mac|macbook|machine)\s+to\s+sleep\b/.test(t)
+      || /\b(sleep|shut\s+down)\s+(the\s+)?(computer|mac|macbook|machine)\b/.test(t)) {
+    computerSleep();
+    return;
+  }
+
+  // App-aware media: "pause spotify", "next track", "play music".
+  if (handleMediaSpeech(t)) return;
+
+  // Send a message: "go to whatsapp and text John I'm running late".
+  const textCmd = parseTextCommand(t);
+  if (textCmd !== null) { sendTextCommand(textCmd); return; }
+
+  // Info queries — all local, all spoken back.
+  // World time first: "what time is it in London" / "time in tokyo".
+  const timeEntry = extractTimePlace(t);
+  if (timeEntry !== null) { tellTimeIn(timeEntry); return; }
+  if (/\bwhat.*time\b/.test(t) || t.includes("time is it")) { tellTime(); return; }
+
+  // Voice math: "what is 36 percent of 2400", "50 plus 30".
+  const mathQ = parseMathQuery(t);
+  if (mathQ !== null) { speakMath(mathQ); return; }
+
+  // Unit conversions: "40 kg in pounds", "how many miles is 5 km".
+  const unitQ = parseUnitQuery(t);
+  if (unitQ !== null) { speakUnit(unitQ); return; }
+
+  if (/\bbattery\b/.test(t)) { tellBattery(); return; }
+  if (/\b(disk|storage)\b/.test(t) && /\b(free|space|left|how much)\b/.test(t)) { tellDisk(); return; }
+
+  // Volume / brightness percentage: "set volume to 50 percent", "increase brightness by 10".
+  const directive = parseVoiceDirective(t);
+  if (directive) { applyVoiceDirective(directive); return; }
+
+  // The phrase mentioned volume/brightness with directive words or a number we
+  // failed to parse — tell the user instead of silently falling into mode.
+  const looksLikeDirective = /\b(increase|decrease|raise|lower|dim|brighten|reduce|set|to|by|up|down|percent|%)\b/.test(t)
+                             || /\d/.test(t) || hasNumberWord(t);
+  if (looksLikeDirective && (t.includes("volume") || t.includes("brightness"))) {
+    voiceStatus.textContent = 'Couldn\'t make sense of that — try "volume 50", "increase brightness by 10"';
+    speak("Sorry, I couldn't turn that into a number");
+    return;
+  }
+
+  // Plain "volume"/"brightness" (no number) → hand-height gesture mode.
+  const heard = [];
+  if (t.includes("volume")) { volumeGestureModeUntil = performance.now() + VOICE_GESTURE_WINDOW_MS; heard.push("volume"); }
+  if (t.includes("brightness")) { brightnessGestureModeUntil = performance.now() + VOICE_GESTURE_WINDOW_MS; heard.push("brightness"); }
+  if (heard.length) {
+    voiceStatus.textContent = `Heard "${heard.join('" / "')}" — raise/lower your hand now`;
+    speak(`${heard.join(" and ")} mode`);
+    return;
+  }
+
+  // Fun + info one-liners — all local, all spoken back.
+  if (/\bgood\s+(morning|afternoon|evening|night)\b/.test(t)) { speak(greetingFor(t)); return; }
+  if (/\b(what(?:'|’)s\s+)?(the\s+)?date\b|\bwhat day is it\b|\btoday(?:'|’)s\s+date\b|\bwhats today\b/.test(t)) { speak("It's " + todaySentence() + "."); return; }
+  if (/\bhow are you\b/.test(t)) { speak("Running smooth, sir. All systems online."); return; }
+  if (/\btell me a joke\b|\bmake me laugh\b/.test(t)) { speak(pickJoke()); return; }
+  if (/\bflip a coin\b|\bcoin ?flip\b|\bheads or tails\b/.test(t)) { speak(Math.random() < 0.5 ? "Heads." : "Tails."); return; }
+  if (/\broll (a |the |a pair of )?(dice|die)\b/.test(t)) { speak("You rolled a " + (1 + Math.floor(Math.random() * 6)) + "."); return; }
+  if (/\block (my |the )?(screen|computer|mac)\b/.test(t)) { lockScreenVoice(); return; }
+  if (/\b(what(?:'|’)s\s+)?my\s+(local\s+)?(ip|i\.p|ip address)\b/.test(t) || /\bmy\s+(local\s+)?(ip|ip address)\s+(number|is)\b/.test(t)) { tellMyIP(); return; }
+  if (/\bwhat can you do\b|\bwhat(?:'|’)s?\s*your\s+commands\b|\bshow (?:me )?(?:the )?commands\b|\bshow (?:me )?(?:the )?cheat ?sheet\b|\b(?:open|list) (?:the )?commands\b/.test(t) || t === "help" || t === "commands") { showCommands(); return; }
+
+  // "open <app name>".
+  const openMatch = t.match(/\bopen\s+(.+)/);
+  if (openMatch && openMatch[1].trim()) {
+    const appName = normalizeAppName(openMatch[1].trim());
+    voiceStatus.textContent = `Opening "${appName}"...`;
+    speak(`Opening ${appName}`);
+    fetch("/api/open-app", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ appName })
+    }).catch(e => console.warn("Open app failed:", e));
+  }
+}
+
+// ---------- Fun + info helpers for the voice commands above ----------
+const JOKES = [
+  "Why don't programmers like nature? Too many bugs.",
+  "There are only 10 kinds of people in the world: those who understand binary, and those who don't.",
+  "Why did the developer go broke? Because he used up all his cache.",
+  "I told my computer I needed a break. Now it won't stop sending me vacation links.",
+  "Parallel lines have so much in common. It's a shame they'll never meet."
+];
+
+function pickJoke() {
+  return JOKES[Math.floor(Math.random() * JOKES.length)];
+}
+
+function todaySentence() {
+  return new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
+function greetingFor(t) {
+  const m = t.match(/\bgood\s+(morning|afternoon|evening|night)\b/);
+  const said = m ? m[1] : "morning";
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const hr = now.getHours();
+  const actual = hr < 12 ? "morning" : hr < 18 ? "afternoon" : hr < 21 ? "evening" : "night";
+  if (said === "night") return `Good night. It's ${timeStr}. Sleep well, sir.`;
+  let line = `Good ${said}! It's ${timeStr}.`;
+  if (said !== actual) line += ` Though it is technically ${actual} — good news, the coffee still works.`;
+  return line;
+}
+
+function lockScreenVoice() {
+  voiceStatus.textContent = "Locking your screen...";
+  speak("Locking your screen");
+  fetch("/api/lock", { method: "POST" }).catch(e => console.warn("Lock failed:", e));
+}
+
+function tellMyIP() {
+  fetch("/api/netinfo").then(r => r.ok ? r.json() : Promise.reject(new Error("bad status"))).then(d => {
+    const ips = d.lan || [];
+    if (!ips.length) speak("I couldn't find a local network address for this Mac.");
+    else speak("Your local IP address is " + ips[0]);
+  }).catch(() => speak("I couldn't read the network information."));
+}
+
+function showCommands() {
+  const sheet = document.getElementById("voiceCheatSheet");
+  sheet.open = true;
+  sheet.scrollIntoView({ behavior: "smooth", block: "center" });
+  speak("Say good morning, or good night. I can control volume and brightness, open apps, control your music, set sleep timers and reminders, tell the time and date, do math and unit conversions, send texts, and run your custom macros. I've opened the full command list on screen.");
+}
+
+// ---------- App-aware media control: "pause spotify", "next track", "play" ----------
+const MEDIA_APP_ALIAS = {
+  spotify: "spotify",
+  "apple music": "music",
+  music: "music",
+  itunes: "music",
+  vlc: "vlc",
+  "quicktime player": "quicktime player",
+  "quick time": "quicktime player",
+  youtube: "youtube",
+  netflix: "netflix",
+  twitch: "twitch",
+  "prime video": "prime",
+  "amazon prime": "prime",
+  "disney plus": "disney",
+  disney: "disney",
+  hulu: "hulu"
+};
+
+function mediaTargetOf(t) {
+  for (const alias of Object.keys(MEDIA_APP_ALIAS)) {
+    if (new RegExp("\\b" + alias.replace(/ /g, "\\s+") + "\\b").test(t)) return MEDIA_APP_ALIAS[alias];
+  }
+  return null;
+}
+
+// Parses media phrases and returns true if one was handled. Conservative on
+// purpose so bare "play", "next", "skip" never hijack math, reminders or other
+// commands.
+function handleMediaSpeech(t) {
+  const compact = t.replace(/\s+/g, "");
+  const target = mediaTargetOf(t);
+  const words = t.split(/\s+/).length;
+  const mediaNoun = /\b(song|music|track|video|playlist|episode|movie|film|album)\b/.test(t);
+
+  let action = null;
+  if (/playpause/.test(compact)) action = "playpause";
+  else if (/\b(resume|play)\b/.test(t) && !/\b(playground|display|player|explain|applied)\b/.test(t)) action = "play";
+  else if (/\b(pause|stop)\b/.test(t) && !/\b(timer|timers|reminder|reminders)\b/.test(t)) action = "pause";
+  else if (/\b(skip|next track|next song|next video|next episode|next)\b/.test(t)) action = "next";
+  else if (/\b(previous track|previous song|prev|go back|rewind)\b/.test(t)) action = "previous";
+
+  if (!action) return false;
+  if (!target) {
+    const explicitNext = /\b(skip|next track|next song|next video|next episode)\b/.test(t);
+    if ((action === "next" || action === "previous") && !mediaNoun && !explicitNext) return false;
+    if (!mediaNoun && words > 3) return false;
+    if (words > 6) return false;
+  }
+  controlMedia(action, target);
+  return true;
+}
+
+async function controlMedia(action, target) {
+  const label = target || "the playing app";
+  voiceStatus.textContent = `${action} on ${label}…`;
+  try {
+    const r = await fetch("/api/media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, app: target })
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      voiceStatus.textContent = d.error || "Couldn't control media";
+      speak(`I couldn't control the media. ${d.error || ""}`);
+      return;
+    }
+    voiceStatus.textContent = `${action} ${target || "the music"}`;
+    speak(`${action} ${target || "the music"}`);
+  } catch (e) {
+    console.warn("Media control failed:", e);
+    voiceStatus.textContent = "Media control failed";
+    speak("Media control failed");
+  }
+}
+
+// ---------- "Open <app> and text <name> <message>" ----------
+const TEXT_APP_ALIAS = { whatsapp: "WhatsApp", telegram: "Telegram", imessage: "Messages", messages: "Messages", message: "Messages" };
+
+function parseTextCommand(t) {
+  const appKeys = Object.keys(TEXT_APP_ALIAS);
+  const verbRe = /\b(text|message|send|msg)\b/;
+
+  let app = null;
+  for (const k of appKeys) {
+    if (new RegExp("\\b" + k + "\\b").test(t)) { app = TEXT_APP_ALIAS[k]; break; }
+  }
+
+  // A sending verb, or the app named up front ("whatsapp john …", "imessage mom …").
+  const firstWord = t.split(/\s+/)[0];
+  const appFirst = appKeys.includes(firstWord);
+  if (!verbRe.test(t) && !appFirst) return null;
+
+  const verbIdx = appFirst ? firstWord.length : t.search(verbRe);
+  if (verbIdx < 0) return null;
+
+  const appRe = "(" + appKeys.join("|") + ")";
+  const stop = ["go", "to", "and", "a", "the", "an", "him", "her", "please"];
+  let rest = t.slice(verbIdx)
+    // "on telegram" / "in whatsapp" — the app can trail a preposition
+    .replace(new RegExp("\\b(?:on|in|via|using)\\s+" + appRe + "\\b", "g"), " ")
+    // then any bare app word
+    .replace(new RegExp("\\b" + appRe + "\\b", "g"), " ")
+    // then the sending verbs
+    .replace(verbRe, " ")
+    // then the filler words (kept out of the strip list: "on"/"in"/"at" are
+    // common message content, e.g. "I'm on my way", "tomorrow at 3")
+    .replace(new RegExp("\\b(" + stop.join("|") + ")\\b", "g"), " ")
+    .replace(/[^a-z0-9\s']/g, " ")
+    .replace(/\s+/g, " ").trim();
+  if (!rest) return null;
+
+  const parts = rest.split(" ");
+  const to = parts[0];
+  const message = parts.slice(1).join(" ").trim();
+  if (message.length < 1) return null;
+  return { app: app || "Messages", to, message };
+}
+
+async function sendTextCommand(cmd) {
+  // WhatsApp/Telegram have no scripting API, so we send through Messages
+  // instead and say so — no UI automation, nothing on screen moves.
+  const app = "Messages";
+  voiceStatus.textContent = `Messaging ${cmd.to}…`;
+  if (cmd.app !== "Messages") {
+    speak(`I can't type inside ${cmd.app}, so I'll send it through Messages instead`);
+  } else {
+    speak(`Opening Messages`);
+  }
+  try {
+    const r = await fetch("/api/text", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ app, to: cmd.to, message: cmd.message })
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      voiceStatus.textContent = d.error || "Couldn't send the message";
+      speak(`I couldn't do that. ${d.error || ""}`);
+      return;
+    }
+    voiceStatus.textContent = `Messaged ${cmd.to}`;
+    speak(`Message sent to ${cmd.to}`);
+  } catch (e) {
+    console.warn("Messaging failed:", e);
+    voiceStatus.textContent = "Messaging failed";
+    speak("Messaging failed");
+  }
+}
+
+// ---------- Voice macros: teach Jarvis your own phrase → action pairs ----------
+// Saved to localStorage so they survive reloads and stay fully offline. A macro
+// is a phrase plus an ordered list of steps; the first macro whose phrase shows
+// up in what you said runs its steps in order.
+const MACRO_STEP_TYPES = {
+  speak: { label: "Say", placeholder: "What Jarvis says" },
+  open: { label: "Open app", placeholder: "App name, e.g. Safari" },
+  volume: { label: "Set volume", placeholder: "0–100" },
+  media: { label: "Media", placeholder: "play / pause / playpause / next / previous" },
+  playlist: { label: "Play playlist", placeholder: "Liked Songs, Spotify link, or Music playlist name" },
+  lock: { label: "Lock screen", placeholder: "no value needed" },
+  screenoff: { label: "Screen off", placeholder: "no value needed" },
+  sleep: { label: "Sleep computer", placeholder: "no value needed" },
+  sleepin: { label: "Sleep in (minutes)", placeholder: "e.g. 30" }
+};
+
+const DEFAULT_MACROS = [
+  { phrase: "goodnight jarvis", steps: [
+    { type: "speak", value: "Goodnight, sir. Sweet dreams." },
+    { type: "screenoff", value: "" }
+  ]},
+  { phrase: "good morning jarvis", steps: [
+    { type: "speak", value: "Good morning, sir. Ready when you are." },
+    { type: "open", value: "Calendar" }
+  ]},
+  { phrase: "start my day", steps: [
+    { type: "open", value: "Safari" },
+    { type: "open", value: "Calendar" },
+    { type: "speak", value: "Your morning tools are open, sir." }
+  ]},
+  { phrase: "code mode", steps: [
+    { type: "open", value: "opencode" },
+    { type: "speak", value: "opencode is ready, sir." }
+  ]},
+  { phrase: "pause the noise", steps: [
+    { type: "media", value: "pause" }
+  ]},
+  { phrase: "keep it down", steps: [
+    { type: "volume", value: "20" }
+  ]},
+  { phrase: "party time", steps: [
+    { type: "open", value: "Spotify" },
+    { type: "volume", value: "100" },
+    { type: "playlist", value: "Liked Songs" },
+    { type: "speak", value: "Party time! Enjoy the music, sir." }
+  ]},
+  { phrase: "movie night", steps: [
+    { type: "open", value: "YouTube" },
+    { type: "speak", value: "Lights down, movie night. Enjoy, sir." }
+  ]},
+  { phrase: "wind down", steps: [
+    { type: "volume", value: "15" },
+    { type: "sleepin", value: "30" },
+    { type: "speak", value: "Volume down. The screen will sleep in thirty minutes, sir." }
+  ]},
+  { phrase: "power nap", steps: [
+    { type: "sleepin", value: "20" },
+    { type: "speak", value: "Setting a twenty minute nap. Rest well, sir." }
+  ]},
+  { phrase: "do not disturb", steps: [
+    { type: "media", value: "pause" },
+    { type: "volume", value: "0" },
+    { type: "speak", value: "Do not disturb. Silence it is, sir." }
+  ]},
+  { phrase: "lock it down", steps: [
+    { type: "lock", value: "" }
+  ]},
+  { phrase: "break time", steps: [
+    { type: "speak", value: "Break time, sir. Stretch those shoulders." },
+    { type: "volume", value: "30" }
+  ]},
+  { phrase: "wake up", steps: [
+    { type: "speak", value: "Good morning again, sir." },
+    { type: "open", value: "Calendar" }
+  ]},
+  { phrase: "workout mode", steps: [
+    { type: "open", value: "Spotify" },
+    { type: "volume", value: "70" },
+    { type: "speak", value: "Workout mode. Let's get moving, sir." }
+  ]}
+];
+
+const MACROS_KEY = "jarvis-macros-v4";
+const MACROS_KEY_LEGACY = "jarvis-macros-v3";
+let macros = [];
+let macroEditingId = null;
+
+function loadMacros() {
+  const raw = localStorage.getItem(MACROS_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) { macros = parsed; return; }
+    } catch (e) { /* corrupt — fall back to defaults */ }
+  }
+  // First run with the new key: seed the expanded defaults, then carry over any
+  // edits the user made under the old storage key so nothing is lost.
+  macros = JSON.parse(JSON.stringify(DEFAULT_MACROS));
+  try {
+    const legacy = JSON.parse(localStorage.getItem(MACROS_KEY_LEGACY) || "[]");
+    if (Array.isArray(legacy)) {
+      const byPhrase = new Map(legacy.map(m => [String(m.phrase).toLowerCase(), m]));
+      macros.forEach(d => {
+        const k = d.phrase.toLowerCase();
+        if (byPhrase.has(k)) { Object.assign(d, byPhrase.get(k)); byPhrase.delete(k); }
+      });
+      for (const extra of byPhrase.values()) macros.push(extra);
+    }
+  } catch (e) { /* legacy read failed — defaults are fine */ }
+  saveMacros();
+}
+
+function saveMacros() {
+  try { localStorage.setItem(MACROS_KEY, JSON.stringify(macros)); } catch (e) { console.warn("Couldn't save macros:", e); }
+  renderMacros();
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function findMacro(t) {
+  for (const m of macros) {
+    const p = String(m.phrase || "").trim().toLowerCase();
+    if (!p) continue;
+    if (t === p) return m;
+    if (new RegExp("\\b" + escapeRegExp(p) + "\\b").test(t)) return m;
+  }
+  return null;
+}
+
+function macroStepLabel(step) {
+  const t = MACRO_STEP_TYPES[step.type] || { label: step.type };
+  return step.value ? `${t.label} "${step.value}"` : t.label;
+}
+
+function renderMacros() {
+  const list = document.getElementById("macrosList");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!macros.length) {
+    const empty = document.createElement("div");
+    empty.className = "hint";
+    empty.textContent = "No macros yet — open “Add / edit a macro” below to create one.";
+    list.appendChild(empty);
+    return;
+  }
+  macros.forEach((m, i) => {
+    const row = document.createElement("div");
+    row.className = "macro-row";
+    const phrase = document.createElement("button");
+    phrase.className = "macro-phrase";
+    phrase.textContent = "“" + m.phrase + "”";
+    phrase.setAttribute("aria-label", `Edit macro ${m.phrase}`);
+    phrase.addEventListener("click", () => openMacroEditor(m));
+    const desc = document.createElement("span");
+    desc.className = "macro-desc";
+    desc.textContent = (m.steps && m.steps.length ? m.steps.map(macroStepLabel).join("  ·  ") : "(no steps)");
+    const del = document.createElement("button");
+    del.className = "small-btn macro-del";
+    del.textContent = "✕";
+    del.setAttribute("aria-label", `Delete macro ${m.phrase}`);
+    del.addEventListener("click", () => {
+      macros.splice(i, 1);
+      saveMacros();
+      speak("Macro deleted");
+    });
+    row.append(phrase, desc, del);
+    list.appendChild(row);
+  });
+}
+
+function macroRow(type, value) {
+  const row = document.createElement("div");
+  row.className = "macro-step";
+  const sel = document.createElement("select");
+  sel.className = "sel step-type";
+  for (const key of Object.keys(MACRO_STEP_TYPES)) {
+    const o = document.createElement("option");
+    o.value = key;
+    o.textContent = MACRO_STEP_TYPES[key].label;
+    if (key === type) o.selected = true;
+    sel.appendChild(o);
+  }
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "step-value";
+  input.maxLength = 120;
+  input.placeholder = MACRO_STEP_TYPES[sel.value].placeholder;
+  input.value = value || "";
+  const noValue = ["lock", "screenoff", "sleep"].includes(sel.value);
+  input.disabled = noValue;
+  input.placeholder = noValue ? "no value needed" : input.placeholder;
+  const remove = document.createElement("button");
+  remove.className = "small-btn step-remove";
+  remove.textContent = "✕";
+  remove.setAttribute("aria-label", "Remove step");
+  sel.addEventListener("change", () => {
+    const t = MACRO_STEP_TYPES[sel.value];
+    const disabled = ["lock", "screenoff", "sleep"].includes(sel.value);
+    input.disabled = disabled;
+    input.placeholder = disabled ? "no value needed" : t.placeholder;
+  });
+  row.append(sel, input, remove);
+  return row;
+}
+
+function openMacroEditor(m) {
+  const editor = document.getElementById("macroEditor");
+  editor.open = true;
+  document.getElementById("macroPhrase").value = m ? m.phrase : "";
+  const steps = document.getElementById("macroSteps");
+  steps.innerHTML = "";
+  const list = m && m.steps && m.steps.length ? m.steps : [{ type: "speak", value: "" }];
+  list.forEach(s => steps.appendChild(macroRow(s.type, s.value)));
+  macroEditingId = m ? macros.indexOf(m) : null;
+  document.getElementById("macroStatus").textContent = m ? `Editing “${m.phrase}” — save to keep changes.` : "";
+  document.getElementById("macroPhrase").focus();
+}
+
+function collectMacroForm() {
+  const phrase = document.getElementById("macroPhrase").value.trim();
+  if (!phrase) {
+    document.getElementById("macroStatus").textContent = "Give the macro a phrase first.";
+    return null;
+  }
+  const steps = [];
+  document.querySelectorAll("#macroSteps .macro-step").forEach(row => {
+    const type = row.querySelector(".step-type").value;
+    const value = row.querySelector(".step-value").value.trim();
+    if (["lock", "screenoff", "sleep"].includes(type)) steps.push({ type, value: "" });
+    else if (value) steps.push({ type, value });
+  });
+  if (!steps.length) {
+    document.getElementById("macroStatus").textContent = "Add at least one step with a value.";
+    return null;
+  }
+  return { phrase, steps };
+}
+
+function setupMacroEditor() {
+  document.getElementById("macroAddStep").addEventListener("click", () => {
+    document.getElementById("macroSteps").appendChild(macroRow("speak", ""));
+  });
+  document.getElementById("macroSteps").addEventListener("click", (ev) => {
+    if (ev.target.closest(".step-remove")) {
+      ev.target.closest(".macro-step").remove();
+    }
+  });
+  document.getElementById("macroSave").addEventListener("click", () => {
+    const m = collectMacroForm();
+    if (!m) return;
+    if (macroEditingId != null && macros[macroEditingId]) macros[macroEditingId] = m;
+    else macros.push(m);
+    saveMacros();
+    document.getElementById("macroEditor").open = false;
+    document.getElementById("macroStatus").textContent = "";
+    speak("Macro saved");
+  });
+  document.getElementById("macroCancel").addEventListener("click", () => {
+    document.getElementById("macroEditor").open = false;
+    macroEditingId = null;
+    document.getElementById("macroStatus").textContent = "";
+  });
+}
+
+async function runMacro(m) {
+  voiceStatus.textContent = `Macro: ${m.phrase}`;
+  speak(`Running ${m.phrase}`);
+  for (const step of (m.steps || [])) {
+    try {
+      switch (step.type) {
+        case "speak":
+          speak(step.value);
+          break;
+        case "open": {
+          const appName = normalizeAppName(step.value);
+          speak(`Opening ${appName}`);
+          await fetch("/api/open-app", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ appName })
+          });
+          break;
+        }
+        case "volume": {
+          const v = Math.max(0, Math.min(100, parseInt(step.value, 10) || 50));
+          voiceStatus.textContent = `Setting volume to ${v}%`;
+          await fetch("/api/volume", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: v })
+          });
+          break;
+        }
+        case "media":
+          controlMedia(String(step.value).toLowerCase(), null);
+          break;
+        case "playlist": {
+          const v = String(step.value).trim();
+          const isSpotify = /^spotify:/i.test(v) || /open\.spotify\.com\//i.test(v) || /\bspotify\b/i.test(v);
+          const liked = /liked songs|saved songs|my music|^likes$/i.test(v);
+          voiceStatus.textContent = "Playing playlist…";
+          try {
+            const r = await fetch("/api/media", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "playlist",
+                app: isSpotify ? "spotify" : liked ? null : "music",
+                uri: v
+              })
+            });
+            const d = await r.json();
+            if (!d.ok && d.error) {
+              voiceStatus.textContent = d.error;
+              speak(d.error);
+            } else {
+              voiceStatus.textContent = "Playing playlist";
+            }
+          } catch (e) {
+            console.warn("Playlist failed:", e);
+            voiceStatus.textContent = "Couldn't play the playlist";
+          }
+          break;
+        }
+        case "lock":
+          await fetch("/api/lock", { method: "POST" });
+          break;
+        case "screenoff":
+          screenSleep();
+          break;
+        case "sleep":
+          computerSleep();
+          break;
+        case "sleepin": {
+          const mins = Math.max(1, Math.min(600, parseInt(step.value, 10) || 10));
+          startSleepTimer(mins * 60);
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn("Macro step failed:", e);
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+}
+
+// ---------- Timed sleep: "sleep in 10 minutes" → screen off after a countdown ----------
+let sleepTimerEnd = 0;          // performance.now() ts when the screen should go off; 0 = no timer
+let sleepTimerInterval = null;
+
+function fmtCountdown(totalSec) {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function cancelSleepTimer(quiet) {
+  if (sleepTimerInterval) { clearInterval(sleepTimerInterval); sleepTimerInterval = null; }
+  sleepTimerEnd = 0;
+  const el = document.getElementById("sleepTimerStatus");
+  if (el) { el.style.display = "none"; el.textContent = ""; }
+  if (!quiet) {
+    voiceStatus.textContent = "Sleep timer cancelled";
+    speak("Sleep timer cancelled");
+  }
+}
+
+// Parses "sleep in 10 minutes", "screen off in 3 hours", "sleep in 5" (minutes)
+// into a delay in seconds; null if it's not a timed-sleep phrase.
+function parseSleepTimer(raw) {
+  const e = expandNumberWords(raw.replace(/\s+/g, " ").trim().toLowerCase());
+  const wantsSleep = /\bsleep\b/.test(e) || /\b(screen|display)\s*(off|sleep|power)\b/.test(e);
+  if (!wantsSleep) return null;
+
+  // Number with an explicit unit: "sleep in 10 minutes", "screen off in 3 hours"
+  const unitMatch = e.match(/\b(\d{1,4})\s*(seconds?|secs?|minutes?|mins?|hrs?|hours?)\b/);
+  if (unitMatch) {
+    const n = parseInt(unitMatch[1], 10);
+    const unit = unitMatch[2].toLowerCase();
+    let seconds;
+    if (unit[0] === "s") seconds = n;
+    else if (unit[0] === "h") seconds = n * 3600;
+    else seconds = n * 60;
+    if (seconds < 10) return null; // too small to be a real screen-off timer
+    return Math.min(seconds, 24 * 3600);
+  }
+
+  // Bare number with "sleep in N" → treat as minutes. Allow short naps too
+  // ("sleep in 5"), but keep a floor so stray chatter like "sleep in 2" can't
+  // start a timer by accident.
+  const bare = e.match(/\bsleep\b.*\bin\s+(\d{1,3})\b/);
+  if (bare) {
+    const n = parseInt(bare[1], 10);
+    if (n >= 2 && n <= 600) return Math.min(n * 60, 24 * 3600);
+  }
+  return null;
+}
+
+function startSleepTimer(totalSeconds) {
+  cancelSleepTimer(true);
+  sleepTimerEnd = performance.now() + totalSeconds * 1000;
+  const el = document.getElementById("sleepTimerStatus");
+  const text = `⏻ Screen off in ${fmtCountdown(totalSeconds)}`;
+  voiceStatus.textContent = text;
+  if (el) { el.textContent = text; el.style.display = "block"; }
+  speak(`Screen off in ${fmtCountdown(totalSeconds)}`);
+
+  sleepTimerInterval = setInterval(() => {
+    const remaining = Math.max(0, Math.round((sleepTimerEnd - performance.now()) / 1000));
+    if (el) el.textContent = `⏻ Screen off in ${fmtCountdown(remaining)}`;
+    if (remaining <= 0) {
+      clearInterval(sleepTimerInterval);
+      sleepTimerInterval = null;
+      sleepTimerEnd = 0;
+      if (el) { el.style.display = "none"; el.textContent = ""; }
+      fireTimedSleep();
+    } else if (remaining === 60 || remaining === 30 || remaining === 10) {
+      speak(`Sleeping in ${remaining} seconds`);
+    }
+  }, 1000);
+}
+
+async function fireTimedSleep() {
+  voiceStatus.textContent = "⏻ Turning the screen off now";
+  speak("Turning off the screen now");
+  try { await fetch("/api/lock", { method: "POST" }); } catch (e) { console.warn("Timed sleep failed:", e); }
+}
+
+async function screenSleep() {
+  voiceStatus.textContent = "Putting the screen to sleep…";
+  speak("Putting the screen to sleep");
+  try { await fetch("/api/lock", { method: "POST" }); } catch (e) { console.warn("Screen sleep failed:", e); }
+}
+
+async function tellTime() {
+  try {
+    const r = await fetch("/api/time");
+    if (r.ok) {
+      const d = await r.json();
+      voiceStatus.textContent = "It's " + d.text;
+      speak(`It is ${d.text}`);
+    }
+  } catch (e) { console.warn("Time failed:", e); }
+}
+
+// ---------- World time: "what time is it in London", "time in Tokyo" ----------
+// City/country → IANA timezone table. Resolved entirely in the browser with
+// Intl.DateTimeFormat — no network calls, so it stays fully offline.
+const CITY_TZ = [
+  { name: "New York", aliases: ["new york", "nyc", "manhattan", "usa", "united states", "america"], tz: "America/New_York" },
+  { name: "Los Angeles", aliases: ["los angeles", "la", "california"], tz: "America/Los_Angeles" },
+  { name: "San Francisco", aliases: ["san francisco", "bay area", "silicon valley"], tz: "America/Los_Angeles" },
+  { name: "Seattle", aliases: ["seattle"], tz: "America/Los_Angeles" },
+  { name: "Las Vegas", aliases: ["las vegas", "vegas"], tz: "America/Los_Angeles" },
+  { name: "Denver", aliases: ["denver"], tz: "America/Denver" },
+  { name: "Chicago", aliases: ["chicago"], tz: "America/Chicago" },
+  { name: "Dallas", aliases: ["dallas", "houston", "austin", "texas"], tz: "America/Chicago" },
+  { name: "Miami", aliases: ["miami"], tz: "America/New_York" },
+  { name: "Washington", aliases: ["washington", "dc"], tz: "America/New_York" },
+  { name: "Honolulu", aliases: ["honolulu", "hawaii"], tz: "Pacific/Honolulu" },
+  { name: "Anchorage", aliases: ["anchorage", "alaska"], tz: "America/Anchorage" },
+  { name: "Toronto", aliases: ["toronto", "montreal", "ottawa"], tz: "America/Toronto" },
+  { name: "Vancouver", aliases: ["vancouver"], tz: "America/Vancouver" },
+  { name: "Mexico City", aliases: ["mexico city", "mexico"], tz: "America/Mexico_City" },
+  { name: "São Paulo", aliases: ["sao paulo", "rio", "brazil"], tz: "America/Sao_Paulo" },
+  { name: "Buenos Aires", aliases: ["buenos aires", "argentina"], tz: "America/Argentina/Buenos_Aires" },
+  { name: "London", aliases: ["london", "uk", "united kingdom", "england", "britain"], tz: "Europe/London" },
+  { name: "Paris", aliases: ["paris", "france"], tz: "Europe/Paris" },
+  { name: "Berlin", aliases: ["berlin", "germany"], tz: "Europe/Berlin" },
+  { name: "Madrid", aliases: ["madrid", "spain", "barcelona"], tz: "Europe/Madrid" },
+  { name: "Rome", aliases: ["rome", "milan", "italy"], tz: "Europe/Rome" },
+  { name: "Amsterdam", aliases: ["amsterdam", "holland", "netherlands"], tz: "Europe/Amsterdam" },
+  { name: "Dublin", aliases: ["dublin", "ireland"], tz: "Europe/Dublin" },
+  { name: "Lisbon", aliases: ["lisbon", "portugal"], tz: "Europe/Lisbon" },
+  { name: "Stockholm", aliases: ["stockholm", "sweden"], tz: "Europe/Stockholm" },
+  { name: "Oslo", aliases: ["oslo", "norway"], tz: "Europe/Oslo" },
+  { name: "Copenhagen", aliases: ["copenhagen", "denmark"], tz: "Europe/Copenhagen" },
+  { name: "Helsinki", aliases: ["helsinki", "finland"], tz: "Europe/Helsinki" },
+  { name: "Zurich", aliases: ["zurich", "switzerland", "geneva"], tz: "Europe/Zurich" },
+  { name: "Vienna", aliases: ["vienna", "austria"], tz: "Europe/Vienna" },
+  { name: "Warsaw", aliases: ["warsaw", "poland"], tz: "Europe/Warsaw" },
+  { name: "Prague", aliases: ["prague", "czech"], tz: "Europe/Prague" },
+  { name: "Budapest", aliases: ["budapest", "hungary"], tz: "Europe/Budapest" },
+  { name: "Athens", aliases: ["athens", "greece"], tz: "Europe/Athens" },
+  { name: "Istanbul", aliases: ["istanbul", "turkey"], tz: "Europe/Istanbul" },
+  { name: "Moscow", aliases: ["moscow", "russia"], tz: "Europe/Moscow" },
+  { name: "Kyiv", aliases: ["kyiv", "kiev", "ukraine"], tz: "Europe/Kyiv" },
+  { name: "Reykjavik", aliases: ["reykjavik", "iceland"], tz: "Atlantic/Reykjavik" },
+  { name: "Cairo", aliases: ["cairo", "egypt"], tz: "Africa/Cairo" },
+  { name: "Lagos", aliases: ["lagos", "nigeria"], tz: "Africa/Lagos" },
+  { name: "Nairobi", aliases: ["nairobi", "kenya"], tz: "Africa/Nairobi" },
+  { name: "Johannesburg", aliases: ["johannesburg", "south africa", "cape town"], tz: "Africa/Johannesburg" },
+  { name: "Jerusalem", aliases: ["jerusalem", "israel", "tel aviv"], tz: "Asia/Jerusalem" },
+  { name: "Dubai", aliases: ["dubai", "abu dhabi", "united arab emirates", "uae"], tz: "Asia/Dubai" },
+  { name: "Doha", aliases: ["doha", "qatar"], tz: "Asia/Qatar" },
+  { name: "Riyadh", aliases: ["riyadh", "saudi arabia"], tz: "Asia/Riyadh" },
+  { name: "Tehran", aliases: ["tehran", "iran"], tz: "Asia/Tehran" },
+  { name: "Karachi", aliases: ["karachi", "islamabad", "pakistan"], tz: "Asia/Karachi" },
+  { name: "Bangalore", aliases: ["bangalore", "bengaluru"], tz: "Asia/Kolkata" },
+  { name: "Kolkata", aliases: ["kolkata", "calcutta"], tz: "Asia/Kolkata" },
+  { name: "West Bengal", aliases: ["west bengal"], tz: "Asia/Kolkata" },
+  { name: "Mumbai", aliases: ["mumbai", "bombay", "india", "delhi", "new delhi"], tz: "Asia/Kolkata" },
+  { name: "Dhaka", aliases: ["dhaka", "bangladesh"], tz: "Asia/Dhaka" },
+  { name: "Bangkok", aliases: ["bangkok", "thailand"], tz: "Asia/Bangkok" },
+  { name: "Jakarta", aliases: ["jakarta", "indonesia", "bali"], tz: "Asia/Jakarta" },
+  { name: "Kuala Lumpur", aliases: ["kuala lumpur", "malaysia"], tz: "Asia/Kuala_Lumpur" },
+  { name: "Singapore", aliases: ["singapore"], tz: "Asia/Singapore" },
+  { name: "Manila", aliases: ["manila", "philippines"], tz: "Asia/Manila" },
+  { name: "Hanoi", aliases: ["hanoi", "vietnam", "ho chi minh"], tz: "Asia/Ho_Chi_Minh" },
+  { name: "Beijing", aliases: ["beijing", "china", "shanghai", "shenzhen"], tz: "Asia/Shanghai" },
+  { name: "Hong Kong", aliases: ["hong kong"], tz: "Asia/Hong_Kong" },
+  { name: "Taipei", aliases: ["taipei", "taiwan"], tz: "Asia/Taipei" },
+  { name: "Seoul", aliases: ["seoul", "south korea", "korea"], tz: "Asia/Seoul" },
+  { name: "Tokyo", aliases: ["tokyo", "japan", "osaka", "kyoto"], tz: "Asia/Tokyo" },
+  { name: "Sydney", aliases: ["sydney", "australia", "melbourne", "canberra"], tz: "Australia/Sydney" },
+  { name: "Brisbane", aliases: ["brisbane"], tz: "Australia/Brisbane" },
+  { name: "Perth", aliases: ["perth"], tz: "Australia/Perth" },
+  { name: "Auckland", aliases: ["auckland", "new zealand", "wellington"], tz: "Pacific/Auckland" },
+];
+
+function extractTimePlace(t) {
+  if (!/\btime\b/.test(t)) return null;
+  const m = t.match(/\btime\b[\s\S]*?\b(?:in|at)\s+([a-z\s&]+)$/);
+  if (!m) return null;
+  const tail = m[1].toLowerCase().replace(/\s+/g, " ").trim();
+  if (!tail) return null;
+  for (const entry of CITY_TZ) {
+    for (const a of entry.aliases) {
+      if (new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(tail)) {
+        return entry;
+      }
+    }
+  }
+  return null;
+}
+
+function tellTimeIn(entry) {
+  try {
+    const now = new Date();
+    const timeStr = new Intl.DateTimeFormat("en-US", { timeZone: entry.tz, hour: "numeric", minute: "2-digit" }).format(now);
+    const dayStr = new Intl.DateTimeFormat("en-US", { timeZone: entry.tz, weekday: "long" }).format(now);
+    const msg = `In ${entry.name}, it's ${timeStr} on ${dayStr}`;
+    voiceStatus.textContent = msg;
+    speak(msg);
+  } catch (e) {
+    console.warn("World time failed:", e);
+    voiceStatus.textContent = "I couldn't work out the time for that location";
+    speak("I could not work out the time for that location");
+  }
+}
+
+// ---------- Full computer sleep: "put the computer to sleep" ----------
+// Round 1 of the sleep-a-long flow: `displaysleepnow` locks the screen,
+// `sleepnow` sleeps the whole Mac. The server already exposes /api/sleep.
+async function computerSleep() {
+  voiceStatus.textContent = "Putting the computer to sleep";
+  speak("Putting the computer to sleep. Goodnight, sir.");
+  try { await fetch("/api/sleep", { method: "POST" }); } catch (e) { console.warn("Sleep failed:", e); }
+}
+
+// ---------- Voice math ----------
+function fmtNum(n) {
+  if (!isFinite(n)) return null;
+  const rounded = Math.round(n * 100) / 100;
+  if (n !== 0 && Math.abs(n) >= 1000000) return rounded.toLocaleString("en-US");
+  return String(rounded);
+}
+
+function parseMathQuery(raw) {
+  const e = expandNumberWords(raw.replace(/\s+/g, " ").trim().toLowerCase()).replace(/,/g, "");
+  if (!/\d/.test(e)) return null;
+  const num = "\\d+(?:\\.\\d+)?";
+  let m;
+  if (/\b(percent|%)\b/.test(e)) {
+    m = e.match(new RegExp(`\\b(${num})\\s*(?:percent|%)\\s+of\\s+(${num})\\b`));
+    if (m) return { type: "percent", a: +m[1], b: +m[2] };
+  }
+  m = e.match(new RegExp(`(${num})\\s+(plus|add|minus|times|multiplied\\s+by|divided\\s+by)\\s+(${num})`));
+  if (m) return { type: "bin", op: m[2], a: +m[1], b: +m[3] };
+  return null;
+}
+
+function speakMath(q) {
+  let val, label;
+  if (q.type === "percent") {
+    val = (q.a / 100) * q.b;
+    label = `${fmtNum(q.a)} percent of ${fmtNum(q.b)} is ${fmtNum(val)}`;
+  } else {
+    switch (q.op) {
+      case "plus": case "add": val = q.a + q.b; label = `${fmtNum(q.a)} plus ${fmtNum(q.b)} is ${fmtNum(val)}`; break;
+      case "minus": val = q.a - q.b; label = `${fmtNum(q.a)} minus ${fmtNum(q.b)} is ${fmtNum(val)}`; break;
+      case "times": case "multiplied by": val = q.a * q.b; label = `${fmtNum(q.a)} times ${fmtNum(q.b)} is ${fmtNum(val)}`; break;
+      case "divided by":
+        if (q.b === 0) { label = "You can't divide by zero"; break; }
+        val = q.a / q.b;
+        label = `${fmtNum(q.a)} divided by ${fmtNum(q.b)} is ${fmtNum(val)}`;
+        break;
+      default: return;
+    }
+  }
+  if (!label) return;
+  voiceStatus.textContent = label;
+  speak(label);
+}
+
+// ---------- Unit conversions ("40 kg in pounds", "how many miles is 5 km") ----------
+const UNIT_FACTS = {
+  kg: { g: "mass", f: 1 }, lb: { g: "mass", f: 0.45359237 }, g: { g: "mass", f: 0.001 }, oz: { g: "mass", f: 0.028349523 },
+  km: { g: "length", f: 1000 }, m: { g: "length", f: 1 }, cm: { g: "length", f: 0.01 },
+  mile: { g: "length", f: 1609.344 }, foot: { g: "length", f: 0.3048 }, inch: { g: "length", f: 0.0254 },
+  liter: { g: "volume", f: 1 }, ml: { g: "volume", f: 0.001 }, gallon: { g: "volume", f: 3.785411784 }, pint: { g: "volume", f: 0.473176473 },
+  second: { g: "time", f: 1 }, minute: { g: "time", f: 60 }, hour: { g: "time", f: 3600 }, day: { g: "time", f: 86400 },
+  c: { g: "temp" }, f: { g: "temp" }, k: { g: "temp" }
+};
+const UNIT_ALIAS = {
+  kg: "kg", kilos: "kg", kilo: "kg", kilogram: "kg", kilograms: "kg", grams: "g", gram: "g",
+  pounds: "lb", pound: "lb", lbs: "lb", lb: "lb", ounces: "oz", ounce: "oz",
+  km: "km", kilometer: "km", kilometers: "km", kilometre: "km", kilometres: "km", meters: "m", meter: "m", metres: "m", metre: "m",
+  centimeters: "cm", centimeter: "cm", centimetres: "cm", centimetre: "cm",
+  miles: "mile", mile: "mile", feet: "foot", foot: "foot", inches: "inch", inch: "inch",
+  liters: "liter", liter: "liter", litres: "liter", litre: "liter",
+  milliliter: "ml", milliliters: "ml", millilitre: "ml", millilitres: "ml",
+  gallons: "gallon", gallon: "gallon", pints: "pint", pint: "pint",
+  seconds: "second", second: "second", minutes: "minute", minute: "minute", hours: "hour", hour: "hour", days: "day", day: "day",
+  celsius: "c", centigrade: "c", fahrenheit: "f", kelvin: "k"
+};
+const UNIT_NAMES = {
+  kg: "kilograms", g: "grams", oz: "ounces", lb: "pounds",
+  km: "kilometers", m: "meters", cm: "centimeters", mile: "miles", foot: "feet", inch: "inches",
+  liter: "liters", ml: "milliliters", gallon: "gallons", pint: "pints",
+  second: "seconds", minute: "minutes", hour: "hours", day: "days",
+  c: "degrees Celsius", f: "degrees Fahrenheit", k: "Kelvin"
+};
+function normUnit(w) {
+  const u = UNIT_ALIAS[w];
+  return u || (UNIT_FACTS[w] ? w : null);
+}
+
+function parseUnitQuery(raw) {
+  const e = expandNumberWords(raw.replace(/\s+/g, " ").trim().toLowerCase()).replace(/,/g, "");
+  if (!/\d/.test(e)) return null;
+  const pairs = [];
+  const re = /(\d+(?:\.\d+)?)\s*([a-z]+)/g;
+  let m;
+  while ((m = re.exec(e))) {
+    const u = normUnit(m[2]);
+    if (u) pairs.push({ n: +m[1], u });
+  }
+  if (!pairs.length) return null;
+  const howMany = e.match(/\bhow many\s+([a-z]+)/);
+  const toWord = e.match(/\bto\s+([a-z]+)/);
+  const inWord = e.match(/\bin\s+([a-z]+)/);
+  const from = pairs[0];
+  let to = pairs.length > 1 ? pairs[1].u : null;
+  if (!to) {
+    const tw = (howMany && howMany[1]) || (toWord && toWord[1]) || (inWord && inWord[1]);
+    if (tw) to = normUnit(tw);
+  }
+  if (!to || to === from.u) return null;
+  return { n: from.n, from: from.u, to };
+}
+
+function convertValue(from, to, n) {
+  const fg = UNIT_FACTS[from], tg = UNIT_FACTS[to];
+  if (fg.g === "temp" && tg.g === "temp") {
+    const c = from === "c" ? n : from === "f" ? (n - 32) * 5 / 9 : n - 273.15;
+    if (to === "c") return c;
+    if (to === "f") return c * 9 / 5 + 32;
+    return c + 273.15;
+  }
+  if (fg.g !== tg.g) return null;
+  return n * (fg.f / tg.f);
+}
+
+function speakUnit(q) {
+  const result = convertValue(q.from, q.to, q.n);
+  if (result === null) {
+    const label = `I can't convert ${UNIT_NAMES[q.from] || q.from} to ${UNIT_NAMES[q.to] || q.to}`;
+    voiceStatus.textContent = label;
+    speak(label);
+    return;
+  }
+  const label = `${fmtNum(q.n)} ${UNIT_NAMES[q.from] || q.from} is about ${fmtNum(result)} ${UNIT_NAMES[q.to] || q.to}`;
+  voiceStatus.textContent = label;
+  speak(label);
+}
+
+// ---------- Reminders: "remind me in 10 minutes to stretch" ----------
+const reminderId = { n: 0 };
+let reminders = [];
+let reminderTick = null;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function parseReminder(raw) {
+  const e = expandNumberWords(raw.replace(/\s+/g, " ").trim().toLowerCase());
+  if (!/\b(remind|reminder|timer)\b/.test(e)) return null;
+  const m = e.match(/\b(\d{1,4})\s*(seconds?|secs?|mins?|minutes?|hrs?|hours?)\b/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  const u = m[2][0];
+  const seconds = u === "h" ? n * 3600 : u === "s" ? n : n * 60;
+  if (seconds < 5) return null;
+  let text = e
+    .replace(/\b(remind|reminders?|timer|cancel|me|set|please|to)\b/g, " ")
+    .replace(/\b(?:in|for|after)\s+\d{1,4}\s*(?:seconds?|secs?|mins?|minutes?|hrs?|hours?)\b/g, " ")
+    .replace(/\b\d{1,4}\s*(?:seconds?|secs?|mins?|minutes?|hrs?|hours?)\b/g, " ")
+    .replace(/\b\d{1,4}\b/g, " ")
+    .replace(/\b(?:in|for|after)\b/g, " ")
+    .replace(/^[^a-z]*|[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ").trim()
+    .replace(/^(?:a|an|to)\s+/, "");
+  if (text.length < 2) text = "Time's up";
+  return { seconds, text };
+}
+
+function renderReminders() {
+  const panel = document.getElementById("remindersPanel");
+  if (!panel) return;
+  if (!reminders.length) { panel.style.display = "none"; panel.innerHTML = ""; return; }
+  panel.style.display = "flex";
+  panel.innerHTML = "";
+  const now = performance.now();
+  reminders.forEach(r => {
+    const chip = document.createElement("div");
+    chip.className = "reminder-chip";
+    const t = document.createElement("span");
+    t.textContent = r.text;
+    t.className = "reminder-text";
+    const when = document.createElement("time");
+    when.textContent = `in ${fmtCountdown(Math.max(0, Math.round((r.end - now) / 1000)))}`;
+    const btn = document.createElement("button");
+    btn.className = "small-btn reminder-x";
+    btn.dataset.id = String(r.id);
+    btn.setAttribute("aria-label", "Dismiss reminder");
+    btn.textContent = "✕";
+    chip.append(when, t, btn);
+    panel.appendChild(chip);
+  });
+}
+
+function startReminder(seconds, text) {
+  reminders.push({ id: ++reminderId.n, end: performance.now() + seconds * 1000, text });
+  voiceStatus.textContent = `Reminder set — ${text} in ${fmtCountdown(seconds)}`;
+  speak(`Reminder set. ${text}, in ${fmtCountdown(seconds)}`);
+  if (!reminderTick) reminderTick = setInterval(updateReminders, 1000);
+  renderReminders();
+}
+
+function updateReminders() {
+  const now = performance.now();
+  const fired = reminders.filter(r => r.end <= now);
+  reminders = reminders.filter(r => r.end > now);
+  for (const r of fired) {
+    voiceStatus.textContent = "Reminder: " + r.text;
+    speak(`${r.text}, sir`);
+  }
+  renderReminders();
+  if (!reminders.length && reminderTick) { clearInterval(reminderTick); reminderTick = null; }
+}
+
+function clearReminders() {
+  reminders = [];
+  if (reminderTick) { clearInterval(reminderTick); reminderTick = null; }
+  renderReminders();
+  voiceStatus.textContent = "All reminders cancelled";
+  speak("All reminders cancelled");
+}
+
+// Dismiss a single reminder from its ✕ button.
+document.getElementById("remindersPanel").addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button.reminder-x");
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  reminders = reminders.filter(r => r.id !== id);
+  if (!reminders.length && reminderTick) { clearInterval(reminderTick); reminderTick = null; }
+  renderReminders();
+});
+
+async function tellBattery() {
+  try {
+    const r = await fetch("/api/battery");
+    if (r.ok) {
+      const d = await r.json();
+      voiceStatus.textContent = `Battery at ${d.percent} percent`;
+      speak(`Battery is at ${d.percent} percent`);
+    }
+  } catch (e) { console.warn("Battery failed:", e); }
+}
+
+async function tellDisk() {
+  try {
+    const r = await fetch("/api/disk");
+    if (r.ok) {
+      const d = await r.json();
+      voiceStatus.textContent = `Disk: ${d.usedPercent} used, ${d.available} free`;
+      speak(`Disk is ${d.usedPercent} full, with ${d.available} free`);
+    }
+  } catch (e) { console.warn("Disk failed:", e); }
+}
+
+// shared hand-height → 0-100 mapping used by both volume and brightness
+function handHeightToPercent(lm) {
+  const wristY = lm[0].y; // 0 at top of frame, 1 at bottom
+  return Math.round(Math.max(0, Math.min(1, 1 - wristY)) * 100);
+}
+
+async function checkVolumeGesture(lm, now) {
+  if (!localServerAvailable || now > volumeGestureModeUntil) return;
+  const level = handHeightToPercent(lm);
+  if (now - lastVolumeSendTime > VOICE_SEND_INTERVAL_MS && level !== lastSentVolumeLevel) {
+    lastVolumeSendTime = now;
+    lastSentVolumeLevel = level;
+    voiceStatus.textContent = `Setting volume: ${level}%`;
+    try {
+      await fetch("/api/volume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: level })
+      });
+    } catch (e) {
+      console.warn("Volume control failed:", e);
+    }
+  }
+  drawVoiceGestureSlider(lm, "Volume", level, "#3fb950");
+}
+
+async function checkBrightnessVoiceGesture(lm, now) {
+  if (!localServerAvailable || now > brightnessGestureModeUntil) return;
+  const level = handHeightToPercent(lm);
+  if (now - lastBrightnessSendTime > VOICE_SEND_INTERVAL_MS && level !== lastSentBrightnessLevel) {
+    lastBrightnessSendTime = now;
+    lastSentBrightnessLevel = level;
+    voiceStatus.textContent = `Setting brightness: ${level}%`;
+    try {
+      await setRealBrightness(level / 100);
+    } catch (e) {
+      console.warn("Brightness control failed:", e);
+    }
+  }
+  drawVoiceGestureSlider(lm, "Brightness", level, "#f0d000");
+}
+
+// on-screen vertical slider bar next to the hand, so you can see the level
+// you're about to set instead of just reading the status text
+function drawVoiceGestureSlider(lm, label, percent, color) {
+  const barHeight = 160, barWidth = 14;
+  const anchorX = lm[0].x * canvas.width + 70;
+  const anchorY = canvas.height / 2;
+  const top = anchorY - barHeight / 2;
+
+  ctx.save();
+  ctx.translate(anchorX, 0);
+  ctx.scale(-1, 1); // undo mirror so the bar and label read correctly
+
+  // track
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(-barWidth / 2, top, barWidth, barHeight);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-barWidth / 2, top, barWidth, barHeight);
+
+  // fill, growing from the bottom
+  const fillHeight = barHeight * (percent / 100);
+  ctx.fillStyle = color;
+  ctx.fillRect(-barWidth / 2, top + (barHeight - fillHeight), barWidth, fillHeight);
+
+  // label + percent
+  ctx.font = "bold 12px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(`${label}`, 0, top - 8);
+  ctx.fillText(`${percent}%`, 0, top + barHeight + 16);
+
+  ctx.restore();
+}
+
+
+// ---------- Both hands as fists → skeleton-only mode (hides the camera image, keeps tracking drawn over black) ----------
+let bothFistsWereActive = false;
+let lastTriggerTime = 0;
+let triggerJustHappened = false;
+const TRIGGER_COOLDOWN_MS = 900;
+const FIST_BEND_THRESHOLD = 55; // degrees — a finger curled at least this much counts as "in the fist"
+
+function isFist(lm) {
+  const bendOf = name => fingerBendAngle(lm, FINGER_TIP_LABELS.find(f => f.name === name).joints);
+  return bendOf("Index") > FIST_BEND_THRESHOLD &&
+         bendOf("Middle") > FIST_BEND_THRESHOLD &&
+         bendOf("Ring") > FIST_BEND_THRESHOLD &&
+         bendOf("Pinky") > FIST_BEND_THRESHOLD;
+}
+
+function checkBothFists(handLandmarksArray, now) {
+  if (!handLandmarksArray || handLandmarksArray.length < 2) {
+    bothFistsWereActive = false;
+    return;
+  }
+  const bothFists = handLandmarksArray.every(isFist);
+
+  if (bothFists && !bothFistsWereActive && now - lastTriggerTime > TRIGGER_COOLDOWN_MS) {
+    lastTriggerTime = now;
+    triggerJustHappened = true;
+  }
+  bothFistsWereActive = bothFists;
+}
+
+let skeletonOnlyMode = false;
+function toggleSkeletonMode() {
+  skeletonOnlyMode = !skeletonOnlyMode;
+  video.style.visibility = skeletonOnlyMode ? "hidden" : "visible";
+  setStatus(
+    skeletonOnlyMode
+      ? "Skeleton-only mode — make both fists again to bring the camera back"
+      : "Tracking live", "ok");
+}
+
+// ---------- Right-hand fist → lock screen (real, via the local server) ----------
+// Hold your right hand still in a fist for a moment and the screen locks.
+// Closing both fists at once still means the skeleton-mode gesture, so the
+// lock is skipped when the left hand is also in a fist.
+let rightFistSince = null;
+let lastRightFistLockTime = 0;
+const RIGHT_FIST_HOLD_MS = 800;        // hold the fist this long before locking — avoids accidental triggers
+const RIGHT_FIST_LOCK_COOLDOWN_MS = 6000; // long cooldown since this is a dramatic, real action
+
+function handIsRight(lm, handedness) {
+  if (handedness && handedness[0]) return handedness[0].categoryName === "Right";
+  return lm[0].x < 0.5; // fallback if handedness is missing: in the raw (unmirrored) frame the user's right hand is camera-left
+}
+
+function rightFistActive(handResult) {
+  if (!localServerAvailable || !handResult || !handResult.landmarks || handResult.landmarks.length === 0) return false;
+  let rightFist = false;
+  let leftHandFist = false;
+  handResult.landmarks.forEach((lm, i) => {
+    const handedness = handResult.handedness && handResult.handedness[i] && handResult.handedness[i][0];
+    if (handIsRight(lm, handedness)) {
+      if (isFist(lm)) rightFist = true;
+    } else {
+      if (isFist(lm)) leftHandFist = true;
+    }
+  });
+  return rightFist && !leftHandFist;
+}
+
+function checkRightFistLock(handResult, now) {
+  if (!rightFistActive(handResult)) {
+    rightFistSince = null;
+    return;
+  }
+  if (rightFistSince === null) rightFistSince = now;
+  if (now - rightFistSince > RIGHT_FIST_HOLD_MS && now - lastRightFistLockTime > RIGHT_FIST_LOCK_COOLDOWN_MS) {
+    lastRightFistLockTime = now;
+    rightFistSince = null; // needs a fresh hold before it can fire again
+    triggerLockScreen();
+  }
+}
+
+async function triggerLockScreen() {
+  setStatus("Locking screen...", "busy");
+  speak("Locking screen");
+  try {
+    await fetch("/api/lock", { method: "POST" });
+  } catch (e) {
+    console.warn("Lock screen failed:", e);
+  }
+}
+
+// ---------- Wellbeing reminders (all computed from the live local face mesh) ----------
+let lastFaceRatio = null; // face width / frame width — proxy for "how close you are"
+let faceNearSince = null;
+let lastPostureRemindAt = 0;
+let lastBlinkAt = performance.now();
+let lastBlinkRemindAt = 0;
+let blinkSnapshot = 0;
+const FACE_NEAR_RATIO = 0.5;          // face this wide in the frame = too close
+const FACE_NEAR_HOLD_MS = 9000;       // stay that close this long before speaking up
+const POSTURE_REMIND_INTERVAL_MS = 30000;
+const BLINK_NUDGE_MS = 45000;         // 45s without a detected blink
+const BLINK_REMIND_INTERVAL_MS = 60000;
+
+function updateWellbeing(now) {
+  if (!toggleWellbeing.checked) {
+    wellbeingStatus.textContent = "";
+    faceNearSince = null;
+    return;
+  }
+  if (blinkCount !== blinkSnapshot && blinkCount > 0) {
+    blinkSnapshot = blinkCount;
+    lastBlinkAt = now;
+  }
+
+  let postureText = "—";
+  if (lastFaceRatio != null) {
+    if (lastFaceRatio > FACE_NEAR_RATIO) {
+      postureText = "too close";
+      if (faceNearSince === null) faceNearSince = now;
+      if (now - faceNearSince > FACE_NEAR_HOLD_MS && now - lastPostureRemindAt > POSTURE_REMIND_INTERVAL_MS) {
+        lastPostureRemindAt = now;
+        speak("You're too close to the screen, move back a bit");
+      }
+    } else {
+      postureText = "ok";
+      faceNearSince = null;
+    }
+  } else {
+    postureText = "no face";
+  }
+
+  let blinkText = "";
+  if (lastFaceRatio != null && now - lastBlinkAt > BLINK_NUDGE_MS) {
+    blinkText = "— blink!";
+    if (now - lastBlinkRemindAt > BLINK_REMIND_INTERVAL_MS) {
+      lastBlinkRemindAt = now;
+      speak("You haven't blinked in a while");
+    }
+  }
+  wellbeingStatus.textContent = `Posture: ${postureText}${blinkText ? " " + blinkText : ""}`;
+}
+
+let fpsWindowStart = performance.now();
+let currentFps = 0;
+
+// ---------- IndexedDB helpers (models saved locally so re-loads and offline use don't need the internet again) ----------
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function getCached(key) {
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const req = tx.objectStore(STORE_NAME).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch { return null; }
+}
+async function saveToCache(key, arrayBuffer) {
+  try {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      tx.objectStore(STORE_NAME).put(arrayBuffer, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { console.warn("Could not cache model locally:", e); }
+}
+async function getModelBuffer(key, url, label) {
+  const cached = await getCached(key);
+  if (cached) return new Uint8Array(cached);
+  offlineBadge.textContent = `📦 Reading ${label} from local files…`;
+  const resp = await fetch(url);
+  const buf = await resp.arrayBuffer();
+  await saveToCache(key, buf);
+  return new Uint8Array(buf);
+}
+
+// ---------- Setup ----------
+// Tries the GPU delegate first (faster), falls back to CPU if the device/browser
+// doesn't support it — GPU delegate support isn't universal, and silently hanging
+// here (as an earlier version of this file did) looks exactly like "nothing works."
+async function createWithGpuFallback(ClassRef, vision, baseOptionsExtra, otherOptions) {
+  try {
+    return await ClassRef.createFromOptions(vision, {
+      baseOptions: { ...baseOptionsExtra, delegate: "GPU" },
+      ...otherOptions
+    });
+  } catch (gpuErr) {
+    console.warn("GPU delegate failed, retrying with CPU:", gpuErr);
+    return await ClassRef.createFromOptions(vision, {
+      baseOptions: { ...baseOptionsExtra, delegate: "CPU" },
+      ...otherOptions
+    });
+  }
+}
+
+async function setup() {
+  try {
+    setStatus("Loading hand, face and body tracking engines...", "busy");
+    const vision = await FilesetResolver.forVisionTasks(
+      "/vendor/wasm"
+    );
+
+    const handBuf = await getModelBuffer("hand_model", HAND_MODEL_URL, "hand model");
+    handLandmarker = await createWithGpuFallback(HandLandmarker, vision, { modelAssetBuffer: handBuf }, {
+      runningMode: "VIDEO",
+      numHands: 2
+    });
+
+    const faceBuf = await getModelBuffer("face_mesh_model", FACE_MODEL_URL, "face model");
+    faceLandmarker = await createWithGpuFallback(FaceLandmarker, vision, { modelAssetBuffer: faceBuf }, {
+      runningMode: "VIDEO",
+      numFaces: 1,
+      outputFaceBlendshapes: true,
+      outputFacialTransformationMatrixes: false
+    });
+
+    const poseBuf = await getModelBuffer("pose_model", POSE_MODEL_URL, "body pose model");
+    poseLandmarker = await createWithGpuFallback(PoseLandmarker, vision, { modelAssetBuffer: poseBuf }, {
+      runningMode: "VIDEO",
+      numPoses: 2
+    });
+
+    offlineBadge.textContent = "💾 All models are local files — no downloads, fully offline";
+    setStatus("Models loaded. Click start.", "armed");
+    startBtn.disabled = false;
+    btnStageStart.disabled = false;
+  } catch (err) {
+    console.error("Setup failed:", err);
+    setStatus("Failed to load tracking engines: " + (err && err.message ? err.message : err), "error");
+    offlineBadge.textContent = "💾 Setup error — see status message";
+  }
+}
+
+btnStageStart.addEventListener("click", () => {
+  if (!startBtn.disabled) startBtn.click();
+});
+
+loadMacros();
+renderMacros();
+setupMacroEditor();
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.repeat) return;
+  const t = ev.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  if ((ev.key === "s" || ev.key === "S") && !running && !startBtn.disabled) {
+    startBtn.click();
+  }
+});
+
+startBtn.addEventListener("click", async () => {
+  startBtn.disabled = true;
+  btnStageStart.disabled = true;
+  setStatus("Requesting camera...", "busy");
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    video.srcObject = stream;
+    await video.play();
+    video.style.opacity = "1";
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    running = true;
+    setStatus("Tracking live", "ok");
+    stagePlaceholder.classList.add("hide");
+    liveBadge.style.display = "flex";
+    requestAnimationFrame(loop);
+  } catch (e) {
+    setStatus("Camera access denied or unavailable: " + e.message, "error");
+    startBtn.disabled = false;
+    btnStageStart.disabled = false;
+  }
+});
+
+// ---------- Per-finger coloring for the hand skeleton ----------
+const FINGERS = {
+  thumb:  { color: "#f0d000", chain: [0, 1, 2, 3, 4] },
+  index:  { color: "#f85149", chain: [0, 5, 6, 7, 8] },
+  middle: { color: "#3fb950", chain: [0, 9, 10, 11, 12] },
+  ring:   { color: "#58a6ff", chain: [0, 13, 14, 15, 16] },
+  pinky:  { color: "#bc6ff1", chain: [0, 17, 18, 19, 20] }
+};
+const PALM_CONNECTIONS = [[5, 9], [9, 13], [13, 17]];
+// [MCP, PIP, TIP] joint indices per finger, used for the bend-angle readout
+const FINGER_TIP_LABELS = [
+  { idx: 4, name: "Thumb", joints: [2, 3, 4] },
+  { idx: 8, name: "Index", joints: [5, 6, 8] },
+  { idx: 12, name: "Middle", joints: [9, 10, 12] },
+  { idx: 16, name: "Ring", joints: [13, 14, 16] },
+  { idx: 20, name: "Pinky", joints: [17, 18, 20] }
+];
+
+function vectorBetween(a, b) {
+  return { x: b.x - a.x, y: b.y - a.y, z: (b.z || 0) - (a.z || 0) };
+}
+function angleBetweenDeg(v1, v2) {
+  const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+  const mag1 = Math.hypot(v1.x, v1.y, v1.z);
+  const mag2 = Math.hypot(v2.x, v2.y, v2.z);
+  if (mag1 === 0 || mag2 === 0) return 0;
+  const cos = Math.min(1, Math.max(-1, dot / (mag1 * mag2)));
+  return Math.acos(cos) * (180 / Math.PI);
+}
+// "bend" = how far the middle joint deviates from straight (0° = fully straight, ~90°+ = curled)
+function fingerBendAngle(lm, joints) {
+  const [mcp, mid, tip] = joints.map(i => lm[i]);
+  const straightAngle = angleBetweenDeg(vectorBetween(mid, mcp), vectorBetween(mid, tip));
+  return Math.round(180 - straightAngle);
+}
+
+function dist3(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0));
+}
+
+// ---------- Body joint angles (elbows + knees) ----------
+// BlazePose landmark indices: shoulders 11/12, elbows 13/14, wrists 15/16,
+// hips 23/24, knees 25/26, ankles 27/28
+const JOINT_ANGLE_LABELS = [
+  { name: "L Elbow", a: 11, b: 13, c: 15 },
+  { name: "R Elbow", a: 12, b: 14, c: 16 },
+  { name: "L Knee", a: 23, b: 25, c: 27 },
+  { name: "R Knee", a: 24, b: 26, c: 28 }
+];
+
+function jointAngle(lm, a, b, c) {
+  return Math.round(angleBetweenDeg(vectorBetween(lm[b], lm[a]), vectorBetween(lm[b], lm[c])));
+}
+
+function drawJointAngles(lm) {
+  JOINT_ANGLE_LABELS.forEach(({ name, a, b, c }) => {
+    // pose landmarks include a visibility score — skip joints the model isn't confident about
+    if (lm[a].visibility < 0.5 || lm[b].visibility < 0.5 || lm[c].visibility < 0.5) return;
+    const angle = jointAngle(lm, a, b, c);
+    const x = lm[b].x * canvas.width;
+    const y = lm[b].y * canvas.height;
+    ctx.save();
+    ctx.translate(x, y - 14);
+    ctx.scale(-1, 1); // undo mirror so text reads correctly
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.7)";
+    ctx.strokeText(`${name} ${angle}°`, 0, 0);
+    ctx.fillStyle = "#e6edf3";
+    ctx.fillText(`${name} ${angle}°`, 0, 0);
+    ctx.restore();
+  });
+}
+
+// ---------- ASL fingerspelling (partial alphabet) ----------
+// Covers letters that are reliably distinguishable from finger-extension state alone.
+// J and Z need motion (not just a static pose) so they're not included here.
+// C, E, G, H, K, M, N, P, Q, R, S, T, X aren't included — they depend on hand
+// orientation or subtle finger overlap that this simple extension-based check
+// can't tell apart reliably; happy to add specific ones if you want them.
+function classifyASLLetter(lm) {
+  const bendOf = {};
+  FINGER_TIP_LABELS.forEach(f => { bendOf[f.name] = fingerBendAngle(lm, f.joints); });
+  const extended = name => bendOf[name] < 35;
+  const curled = name => bendOf[name] > 70;
+
+  const handScale = dist3(lm[0], lm[9]);
+  const thumbOut = dist3(lm[4], lm[17]) > dist3(lm[3], lm[17]);
+  const thumbIndexPinch = dist3(lm[4], lm[8]) / handScale < 0.35;
+  const indexMiddleGap = dist3(lm[8], lm[12]) / handScale;
+
+  const idxE = extended("Index"), midE = extended("Middle"), ringE = extended("Ring"), pinkyE = extended("Pinky");
+  const idxC = curled("Index"), midC = curled("Middle"), ringC = curled("Ring"), pinkyC = curled("Pinky");
+
+  if (idxC && midC && ringC && pinkyC && !thumbOut) return "A";
+  if (idxE && midE && ringE && pinkyE && !thumbOut) return "B";
+  if (idxE && midC && ringC && pinkyC && !thumbIndexPinch) return "D";
+  if (thumbIndexPinch && midE && ringE && pinkyE) return "F";
+  if (idxC && midC && ringC && pinkyE && !thumbOut) return "I";
+  if (idxE && midC && ringC && pinkyC && thumbOut) return "L";
+  if (thumbIndexPinch && idxC && midC && ringC && pinkyC) return "O";
+  if (idxE && midE && ringC && pinkyC && indexMiddleGap < 0.25) return "U";
+  if (idxE && midE && ringC && pinkyC && indexMiddleGap >= 0.25) return "V";
+  if (idxE && midE && ringE && pinkyC && thumbOut) return "W";
+  if (idxC && midC && ringC && pinkyE && thumbOut) return "Y";
+
+  return "—";
+}
+
+// ---------- Web-slinger sign → mask on face ----------
+// thumb + index + pinky extended, middle + ring curled (the "I love you" / rock-on shape)
+function isWebSlingerSign(lm) {
+  const bendOf = name => fingerBendAngle(lm, FINGER_TIP_LABELS.find(f => f.name === name).joints);
+  const indexExt = bendOf("Index") < 35;
+  const pinkyExt = bendOf("Pinky") < 35;
+  const middleCurled = bendOf("Middle") > 70;
+  const ringCurled = bendOf("Ring") > 70;
+  const thumbOut = dist3(lm[4], lm[17]) > dist3(lm[3], lm[17]);
+  return indexExt && pinkyExt && middleCurled && ringCurled && thumbOut;
+}
+
+// A generic red/black spider-web mask — not the licensed Marvel design, just inspired by it.
+function drawWebMask(lm) {
+  const rightEye = lm[33], leftEye = lm[263], nose = lm[4];
+  const eyeDist = dist3(rightEye, leftEye);
+
+  const cx = ((rightEye.x + leftEye.x) / 2) * canvas.width;
+  const cy = nose.y * canvas.height - (eyeDist * canvas.width * 0.15);
+  const w = eyeDist * canvas.width * 3.6;
+  const h = w * 1.25;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(-1, 1); // undo mirror so the mask isn't backwards relative to the face
+
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "#c81e1e";
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#1a1a1a";
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(0,0,0,0.6)";
+  ctx.lineWidth = 2;
+  const rays = 10;
+  for (let i = 0; i < rays; i++) {
+    const angle = (Math.PI * 2 * i) / rays;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(angle) * w / 2, Math.sin(angle) * h / 2);
+    ctx.stroke();
+  }
+  for (let r = 0.2; r < 1; r += 0.2) {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, (w / 2) * r, (h / 2) * r, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  const eyeOffsetX = w * 0.22;
+  const eyeY = -h * 0.05;
+  [-1, 1].forEach(side => {
+    ctx.save();
+    ctx.translate(side * eyeOffsetX, eyeY);
+    ctx.rotate(side * -0.35);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w * 0.16, h * 0.11, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#1a1a1a";
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
+// ---------- 3D scan: live face mesh → rotatable 3D model + .OBJ export ----------
+// The mesh already carries 3D depth (z) per landmark and the engine exposes its
+// triangle list (FACE_LANDMARKS_TESSELATION) — so a real rotating 3D model can
+// be drawn with plain canvas math and exported as a standard .OBJ file. No
+// libraries, no network: the whole scan runs inside this browser tab.
+const scanCanvas = document.getElementById("scanCanvas");
+const scanCtx = scanCanvas.getContext("2d");
+const SCAN_SIZE = 320;
+scanCanvas.width = scanCanvas.height = SCAN_SIZE;
+const scanStatus = document.getElementById("scanStatus");
+let lastScanMesh = null;   // refreshed each detection frame from the live face
+let scanFrozenMesh = null; // a captured snapshot, shown instead when set
+const scanOrbit = { yaw: 0, pitch: 0, spin: 0.005 };
+let scanZoom = 1;
+let scanDragging = false;
+let lastScanT = 0;
+
+// Converts one face landmark set into head-centered 3D points (eye distance = 1),
+// keeping the raw normalized coords as the texture UVs (u=x, v=1-y).
+function buildFaceMesh3D(lm) {
+  const eyeL = lm[33], eyeR = lm[263];
+  const d = Math.hypot(eyeR.x - eyeL.x, eyeR.y - eyeL.y, (eyeR.z || 0) - (eyeL.z || 0));
+  if (!(d > 1e-6)) return null;
+  const cx = (eyeL.x + eyeR.x) / 2;
+  const cy = (eyeL.y + eyeR.y) / 2;
+  const s = 1 / d;
+  const zMul = 2.6; // depth exaggeration so the scan has visible shape (MediaPipe z is shallow)
+  return lm.map(p => ({
+    x: (p.x - cx) * s,
+    y: (p.y - cy) * s,
+    z: (p.z || 0) * s * zMul,
+    u: Math.max(0, Math.min(1, p.x)),
+    v: Math.max(0, Math.min(1, 1 - p.y))
+  }));
+}
+
+// Damped blend toward the newest detection — the mesh jitters a little frame to
+// frame, and lerping makes the scan preview read as a calm hologram.
+function lerpMesh(from, to, t) {
+  if (!from || from.length !== to.length) return to;
+  return to.map((p, i) => {
+    const f = from[i];
+    return { x: f.x + (p.x - f.x) * t, y: f.y + (p.y - f.y) * t, z: f.z + (p.z - f.z) * t, u: p.u, v: p.v };
+  });
+}
+
+function rotScan(p, yaw, pitch) {
+  const cY = Math.cos(yaw), sY = Math.sin(yaw);
+  const cP = Math.cos(pitch), sP = Math.sin(pitch);
+  const x1 = p.x * cY + p.z * sY, z1 = -p.x * sY + p.z * cY;
+  const y1 = p.y * cP - z1 * sP, z2 = p.y * sP + z1 * cP;
+  return { x: x1, y: y1, z: z2 };
+}
+
+function renderScan(t) {
+  requestAnimationFrame(renderScan);
+  if (t - lastScanT < 40) return; // ~25fps is plenty for a scan viewer
+  lastScanT = t;
+  const W = SCAN_SIZE, H = SCAN_SIZE;
+
+  const mesh = scanFrozenMesh || lastScanMesh;
+  scanCtx.clearRect(0, 0, W, H);
+  if (!mesh || mesh.length === 0) {
+    scanCtx.fillStyle = "rgba(150,175,205,0.75)";
+    scanCtx.font = "13px sans-serif";
+    scanCtx.textAlign = "center";
+    scanCtx.fillText("Fit your face in the camera to scan", W / 2, H / 2);
+    return;
+  }
+
+  // Gentle spin only while frozen — live stays face-on and stable.
+  const spinning = !!scanFrozenMesh && !scanDragging;
+  if (spinning) scanOrbit.yaw += scanOrbit.spin * 2.5;
+  const yaw = scanOrbit.yaw + (spinning ? scanOrbit.spin : 0);
+  const pitch = scanOrbit.pitch;
+
+  const midX = W / 2, midY = H / 2;
+  const camD = 3.0;
+
+  // One rotate pass; autofit the whole model so it always fills the canvas.
+  let maxR = 1e-6;
+  const rot = mesh.map(p => {
+    const r = rotScan(p, yaw, pitch);
+    maxR = Math.max(maxR, Math.hypot(r.x, r.y, r.z));
+    return r;
+  });
+  const viewScale = W * 0.34 * scanZoom / maxR;
+
+  const projected = rot.map(r => {
+    const s = viewScale * (camD / (camD - r.z));
+    return { x: r.x * s, y: r.y * s, rx: r.x, ry: r.y, rz: r.z };
+  });
+
+  const tri = FaceLandmarker.FACE_LANDMARKS_TESSELATION;
+  const tris = [];
+  for (let i = 0; i < tri.length; i += 3) {
+    const a = projected[tri[i]], b = projected[tri[i + 1]], c = projected[tri[i + 2]];
+    if (!a || !b || !c) continue;
+    tris.push({ a, b, c, depth: (a.rz + b.rz + c.rz) / 3 });
+  }
+  tris.sort((p, q) => p.depth - q.depth); // far → near
+
+  // Solid flat-shaded surface — brightness from the triangle normal so the
+  // model has clear 3D form instead of reading as scattered points.
+  tris.forEach(t => {
+    const ux = t.b.rx - t.a.rx, uy = t.b.ry - t.a.ry, uz = t.b.rz - t.a.rz;
+    const vx = t.c.rx - t.a.rx, vy = t.c.ry - t.a.ry, vz = t.c.rz - t.a.rz;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const nl = Math.hypot(nx, ny, nz);
+    if (nl < 1e-8) return;
+    nx /= nl; ny /= nl; nz /= nl;
+    if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; } // +z faces the camera
+    const bri = Math.max(0, nx * 0.2 + ny * 0.48 + nz * 0.85);
+    const shade = 0.2 + bri * 0.8;
+    scanCtx.beginPath();
+    scanCtx.moveTo(midX + t.a.x, midY + t.a.y);
+    scanCtx.lineTo(midX + t.b.x, midY + t.b.y);
+    scanCtx.lineTo(midX + t.c.x, midY + t.c.y);
+    scanCtx.closePath();
+    scanCtx.fillStyle = `rgba(${Math.round(36 + shade * 96)}, ${Math.round(140 + shade * 105)}, 255, 0.96)`;
+    scanCtx.fill();
+  });
+
+  // Thin wireframe on top so it reads as a 3D model, not a flat blob.
+  scanCtx.lineWidth = 0.5;
+  scanCtx.strokeStyle = "rgba(170, 205, 255, 0.22)";
+  tris.forEach(t => {
+    scanCtx.beginPath();
+    scanCtx.moveTo(midX + t.a.x, midY + t.a.y);
+    scanCtx.lineTo(midX + t.b.x, midY + t.b.y);
+    scanCtx.lineTo(midX + t.c.x, midY + t.c.y);
+    scanCtx.stroke();
+  });
+}
+requestAnimationFrame(renderScan);
+
+function scanCanvasOffset(ev) {
+  const r = scanCanvas.getBoundingClientRect();
+  return {
+    x: (ev.clientX - r.left) / r.width * SCAN_SIZE,
+    y: (ev.clientY - r.top) / r.height * SCAN_SIZE
+  };
+}
+scanCanvas.addEventListener("pointerdown", ev => {
+  scanDragging = true;
+  scanCanvas.setPointerCapture(ev.pointerId);
+  scanCanvas._last = scanCanvasOffset(ev);
+});
+scanCanvas.addEventListener("pointermove", ev => {
+  if (!scanDragging) return;
+  const p = scanCanvasOffset(ev);
+  const d = scanCanvas._last;
+  const dx = p.x - d.x, dy = p.y - d.y;
+  scanOrbit.yaw += dx * 0.008;
+  scanOrbit.pitch = Math.max(-1.25, Math.min(1.25, scanOrbit.pitch + dy * 0.008));
+  scanCanvas._last = p;
+});
+scanCanvas.addEventListener("pointerup", () => { scanDragging = false; });
+scanCanvas.addEventListener("pointercancel", () => { scanDragging = false; });
+scanCanvas.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  scanZoom = Math.max(0.6, Math.min(2.2, scanZoom + (ev.deltaY < 0 ? 0.1 : -0.1)));
+}, { passive: false });
+
+document.getElementById("scanFreeze").addEventListener("click", () => {
+  if (!lastScanMesh) { scanStatus.textContent = "No face in view to freeze — get in front of the camera."; return; }
+  scanFrozenMesh = lastScanMesh; // immutable snapshot — buildFaceMesh3D returns fresh objects each frame
+  scanStatus.textContent = "Frozen — spinning. Move your head, then Freeze again to rescan.";
+});
+document.getElementById("scanUnfreeze").addEventListener("click", () => {
+  scanFrozenMesh = null;
+  scanStatus.textContent = "";
+});
+
+function downloadBlob(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+async function exportScanOBJ() {
+  const mesh = scanFrozenMesh || lastScanMesh;
+  if (!mesh) { scanStatus.textContent = "No mesh to save — scan a face first."; return; }
+
+  // A real texture snapshot of the raw camera frame (mirror CSS doesn't affect drawImage).
+  const tex = document.createElement("canvas");
+  const T = 512;
+  tex.width = tex.height = T;
+  const tctx = tex.getContext("2d");
+  if (video.videoWidth) tctx.drawImage(video, 0, 0, T, T);
+
+  const tri = FaceLandmarker.FACE_LANDMARKS_TESSELATION;
+  const unit = 90; // OBJ units so the model is a usable size
+  const faceCount = Math.floor(tri.length / 3);
+  const lines = [];
+  lines.push("# Jarvis local 3D head scan — generated entirely on this Mac");
+  lines.push("mtllib jarvis-head.mtl");
+  lines.push("o Jarvis_Head_Scan");
+  lines.push("usemtl jarvis_head");
+  mesh.forEach(p => lines.push(`v ${(p.x * unit).toFixed(3)} ${(-p.y * unit).toFixed(3)} ${(p.z * unit).toFixed(3)}`));
+  mesh.forEach(p => lines.push(`vt ${p.u.toFixed(4)} ${p.v.toFixed(4)}`));
+  for (let i = 0; i < tri.length; i += 3) {
+    const a = tri[i] + 1, b = tri[i + 1] + 1, c = tri[i + 2] + 1;
+    lines.push(`f ${a}/${a} ${b}/${b} ${c}/${c}`);
+  }
+  const objBlob = new Blob([lines.join("\n") + "\n"], { type: "model/obj" });
+  downloadBlob(objBlob, "jarvis-head.obj");
+  downloadBlob(new Blob([
+    "newmtl jarvis_head\nKa 0.25 0.25 0.25\nKd 1 1 1\nKs 0.15 0.15 0.15\nmap_Kd jarvis-head.jpg\n"
+  ], { type: "text/plain" }), "jarvis-head.mtl");
+  tex.toBlob(b => downloadBlob(b, "jarvis-head.jpg"), "image/jpeg", 0.92);
+  scanStatus.textContent = `Saved — ${mesh.length} vertices, ${faceCount} triangles. Check your Downloads folder.`;
+}
+document.getElementById("scanSave").addEventListener("click", exportScanOBJ);
+
+// ---------- Fingerspelling → words ----------
+// Builds words from held letter shapes, not full ASL signs — see the note above.
+const LETTER_HOLD_MS = 600;      // how long a shape must stay steady before it commits
+const WORD_BREAK_MS = 1300;      // how long with no recognized letter before the word finalizes
+let spellLastLetter = "—";
+let spellLetterSince = performance.now();
+let spellCommittedThisHold = false;
+let spellNoLetterSince = null;
+let currentWord = "";
+let completedWords = [];
+
+function updateSpelling(letter, now) {
+  if (letter !== spellLastLetter) {
+    spellLastLetter = letter;
+    spellLetterSince = now;
+    spellCommittedThisHold = false;
+  } else if (letter !== "—" && !spellCommittedThisHold && now - spellLetterSince > LETTER_HOLD_MS) {
+    currentWord += letter;
+    spellCommittedThisHold = true;
+  }
+
+  if (letter === "—") {
+    if (spellNoLetterSince === null) spellNoLetterSince = now;
+    if (currentWord && now - spellNoLetterSince > WORD_BREAK_MS) {
+      completedWords.push(currentWord);
+      if (completedWords.length > 8) completedWords.shift();
+      currentWord = "";
+    }
+  } else {
+    spellNoLetterSince = null;
+  }
+
+  spellingCurrent.textContent = currentWord || "\u00A0";
+  spellingWords.textContent = completedWords.length ? completedWords.join(" ") : "—";
+}
+
+function resetSpelling() {
+  currentWord = "";
+  completedWords = [];
+  spellLastLetter = "—";
+  spellNoLetterSince = null;
+  spellingCurrent.textContent = "\u00A0";
+  spellingWords.textContent = "—";
+}
+clearWordsBtn.addEventListener("click", resetSpelling);
+
+// ---------- Face HUD: bounding box, corner brackets, expression ----------
+function computeFaceBox(lm) {
+  let minX = 1, maxX = 0, minY = 1, maxY = 0;
+  lm.forEach(p => {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  });
+  const pad = 0.03;
+  return {
+    x1: Math.max(0, minX - pad) * canvas.width,
+    y1: Math.max(0, minY - pad) * canvas.height,
+    x2: Math.min(1, maxX + pad) * canvas.width,
+    y2: Math.min(1, maxY + pad) * canvas.height
+  };
+}
+
+const EXPRESSION_COLORS = { HAPPY: "#3fb950", SAD: "#58a6ff", ANGRY: "#f85149", NEUTRAL: "#f5d100" };
+
+function drawCornerBox(box, color) {
+  const len = Math.min(box.x2 - box.x1, box.y2 - box.y1) * 0.18;
+  ctx.strokeStyle = color || "#f5d100";
+  ctx.lineWidth = 3;
+  const corners = [
+    [box.x1, box.y1, 1, 1],
+    [box.x2, box.y1, -1, 1],
+    [box.x1, box.y2, 1, -1],
+    [box.x2, box.y2, -1, -1]
+  ];
+  corners.forEach(([x, y, dx, dy]) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + dx * len, y);
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + dy * len);
+    ctx.stroke();
+  });
+}
+
+// Classifies a basic expression from the face model's own blendshape scores — no extra model, fully local.
+// Blink/wink counter — edge-detects the eyeBlink blendshapes going from open to closed.
+// Both eyes closing together = a blink; only one eye = a wink.
+let leftEyeClosed = false, rightEyeClosed = false;
+let blinkCount = 0, winkCount = 0;
+function updateBlinkTracking(blendshapeResult) {
+  if (!blendshapeResult || !blendshapeResult.categories) return;
+  const score = name => {
+    const cat = blendshapeResult.categories.find(c => c.categoryName === name);
+    return cat ? cat.score : 0;
+  };
+  const leftNowClosed = score("eyeBlinkLeft") > 0.5;
+  const rightNowClosed = score("eyeBlinkRight") > 0.5;
+
+  const leftJustClosed = leftNowClosed && !leftEyeClosed;
+  const rightJustClosed = rightNowClosed && !rightEyeClosed;
+
+  if (leftJustClosed && rightJustClosed) {
+    blinkCount++;
+  } else if (leftJustClosed || rightJustClosed) {
+    winkCount++;
+  }
+
+  leftEyeClosed = leftNowClosed;
+  rightEyeClosed = rightNowClosed;
+}
+
+function classifyExpression(blendshapeResult) {
+  if (!blendshapeResult || !blendshapeResult.categories) return "—";
+  const score = name => {
+    const cat = blendshapeResult.categories.find(c => c.categoryName === name);
+    return cat ? cat.score : 0;
+  };
+  const smile = (score("mouthSmileLeft") + score("mouthSmileRight")) / 2;
+  const frown = (score("mouthFrownLeft") + score("mouthFrownRight")) / 2;
+  const browDown = (score("browDownLeft") + score("browDownRight")) / 2;
+  const browInnerUp = score("browInnerUp");
+
+  if (smile > 0.35) return "HAPPY";
+  if (browDown > 0.3 && frown > 0.1) return "ANGRY";
+  if (frown > 0.12 || browInnerUp > 0.22) return "SAD";
+  return "NEUTRAL";
+}
+
+function drawHand(lm) {
+  Object.values(FINGERS).forEach(finger => {
+    ctx.strokeStyle = finger.color;
+    ctx.lineWidth = 3;
+    for (let i = 0; i < finger.chain.length - 1; i++) {
+      const a = lm[finger.chain[i]], b = lm[finger.chain[i + 1]];
+      ctx.beginPath();
+      ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
+      ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
+      ctx.stroke();
+    }
+    finger.chain.forEach(i => {
+      const p = lm[i];
+      ctx.beginPath();
+      ctx.arc(p.x * canvas.width, p.y * canvas.height, 4, 0, Math.PI * 2);
+      ctx.fillStyle = finger.color;
+      ctx.fill();
+    });
+  });
+
+  ctx.strokeStyle = "#8b949e";
+  ctx.lineWidth = 2;
+  PALM_CONNECTIONS.forEach(([a, b]) => {
+    ctx.beginPath();
+    ctx.moveTo(lm[a].x * canvas.width, lm[a].y * canvas.height);
+    ctx.lineTo(lm[b].x * canvas.width, lm[b].y * canvas.height);
+    ctx.stroke();
+  });
+
+  if (toggleLabels.checked) {
+    FINGER_TIP_LABELS.forEach(({ idx, name, joints }) => {
+      const p = lm[idx];
+      const x = p.x * canvas.width;
+      const y = p.y * canvas.height;
+      const bend = fingerBendAngle(lm, joints);
+      const label = toggleAngles.checked ? `${name} ${bend}°` : name;
+      ctx.save();
+      ctx.translate(x, y - 14);
+      ctx.scale(-1, 1); // undo mirror so text reads correctly
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.7)";
+      ctx.strokeText(label, 0, 0);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    });
+  }
+
+  drawPinchMeter(lm);
+}
+
+// Pinch % meter — thumb-to-index distance, normalized against the hand's own size
+// (wrist-to-middle-knuckle) so it roughly holds up regardless of distance from camera.
+function drawPinchMeter(lm) {
+  const handScale = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y, (lm[9].z || 0) - (lm[0].z || 0));
+  const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y, (lm[4].z || 0) - (lm[8].z || 0));
+  const MIN_RATIO = 0.15; // real fingertips never quite reach 0 distance in the tracking data — this is "as closed as it gets"
+  const MAX_RATIO = 1.3;  // roughly full finger spread
+  const ratio = handScale > 0 ? pinchDist / handScale : 0;
+  const pinchPercent = Math.round(Math.min(100, Math.max(0, 100 * (MAX_RATIO - ratio) / (MAX_RATIO - MIN_RATIO))));
+
+  const barX = lm[0].x * canvas.width;
+  const barY = lm[0].y * canvas.height + 24;
+  const barW = 60, barH = 8;
+
+  ctx.save();
+  ctx.translate(barX, barY);
+  ctx.scale(-1, 1); // undo mirror so the bar fills the intuitive direction
+
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(-barW / 2, 0, barW, barH);
+  ctx.fillStyle = "#3fb950";
+  ctx.fillRect(-barW / 2, 0, barW * (pinchPercent / 100), barH);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-barW / 2, 0, barW, barH);
+
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(`Pinch ${pinchPercent}%`, 0, barH + 14);
+  ctx.restore();
+}
+
+// ---------- Main loop ----------
+let lastHandResult = null, lastFaceResult = null, lastPoseResult = null;
+let detectionFrameCounter = 0;
+const DETECTION_INTERVAL = 2; // run the actual models every 2nd new video frame — halves the compute load; drawing still updates every frame using the last known result
+
+function loop() {
+  if (!running) return;
+  const now = performance.now();
+
+  // rolling FPS counter over ~500ms windows, based on the render loop itself
+  fpsFrames++;
+  if (now - fpsWindowStart >= 500) {
+    currentFps = Math.round((fpsFrames * 1000) / (now - fpsWindowStart));
+    fpsFrames = 0;
+    fpsWindowStart = now;
+  }
+
+  try {
+    if (video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      detectionFrameCounter++;
+
+      let handResult = lastHandResult, faceResult = lastFaceResult, poseResult = lastPoseResult;
+      if (detectionFrameCounter % DETECTION_INTERVAL === 0) {
+        handResult = toggleHand.checked ? handLandmarker.detectForVideo(video, now) : null;
+        faceResult = toggleFace.checked ? faceLandmarker.detectForVideo(video, now) : null;
+        poseResult = toggleBody.checked ? poseLandmarker.detectForVideo(video, now) : null;
+        lastHandResult = handResult;
+        lastFaceResult = faceResult;
+        lastPoseResult = poseResult;
+      }
+
+      if (handResult && handResult.landmarks) checkBothFists(handResult.landmarks, now);
+      if (handResult && handResult.landmarks) checkRightFistLock(handResult, now);
+      if (triggerJustHappened) {
+        triggerJustHappened = false;
+        toggleSkeletonMode();
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let handCount = 0, faceCount = 0, poseCount = 0;
+
+      if (poseResult && poseResult.landmarks) {
+        poseResult.landmarks.forEach(lm => {
+          poseCount++;
+          drawingUtils.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, { color: "#8b949e", lineWidth: 3 });
+          drawingUtils.drawLandmarks(lm, { color: "#e6edf3", radius: 3 });
+          drawJointAngles(lm);
+        });
+      }
+
+      let currentFaceLmForMask = null;
+      if (faceResult && faceResult.faceLandmarks && faceResult.faceLandmarks.length > 0) {
+        faceResult.faceLandmarks.forEach((lm, i) => {
+          faceCount++;
+          currentFaceLmForMask = lm;
+          lastScanMesh = lerpMesh(lastScanMesh, buildFaceMesh3D(lm), 0.4);
+          // contour lines (eyes, brows, lips, jawline) — no dots, keeps it from looking too busy
+          drawingUtils.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_CONTOURS, { color: "#ff9d4d", lineWidth: 1.5 });
+          const blendshapes = faceResult.faceBlendshapes && faceResult.faceBlendshapes[i];
+          const expression = classifyExpression(blendshapes);
+          updateBlinkTracking(blendshapes);
+          const box = computeFaceBox(lm);
+          lastFaceRatio = (box.x2 - box.x1) / canvas.width;
+          drawCornerBox(box, EXPRESSION_COLORS[expression] || EXPRESSION_COLORS.NEUTRAL);
+
+          const nose = lm[1];
+          hudReadout.style.display = "block";
+          hudPerson.textContent = "DETECTED";
+          hudExpr.textContent = expression;
+          hudPoints.textContent = lm.length;
+          hudPos.textContent = `${Math.round(nose.x * canvas.width)} / ${Math.round(nose.y * canvas.height)}`;
+          hudBlinks.textContent = blinkCount;
+          hudWinks.textContent = winkCount;
+        });
+      } else {
+        // No face in view — clear the stored proximity so wellbeing doesn't
+        // keep nagging "too close" (and "no blink") with a stale ratio.
+        lastFaceRatio = null;
+        hudReadout.style.display = toggleFace.checked ? "block" : "none";
+        hudPerson.textContent = "NOT DETECTED";
+        hudExpr.textContent = "—";
+        hudPoints.textContent = "—";
+        hudPos.textContent = "—";
+      }
+
+      let aslLetter = "—";
+      let webSlingerActive = false;
+      if (handResult && handResult.landmarks) {
+        handResult.landmarks.forEach((lm, i) => {
+          handCount++;
+          drawHand(lm);
+          if (toggleASL.checked && i === 0) {
+            aslLetter = classifyASLLetter(lm);
+          }
+          if (isWebSlingerSign(lm)) webSlingerActive = true;
+          if (i === 0) checkPinchOpen(lm, now);
+          if (i === 0) checkBrightnessPinch(lm, now);
+          if (i === 0) checkVolumeGesture(lm, now);
+          if (i === 0) checkBrightnessVoiceGesture(lm, now);
+        });
+      }
+      if (webSlingerActive && currentFaceLmForMask) drawWebMask(currentFaceLmForMask);
+
+      updateWellbeing(now);
+
+      spellingPanel.style.display = toggleASL.checked ? "flex" : "none";
+      if (toggleASL.checked) updateSpelling(aslLetter, now);
+
+      readoutEl.innerHTML =
+        `Hands: <b>${handCount}</b> &nbsp; Face: <b>${faceCount}</b> &nbsp; Body: <b>${poseCount}</b> people &nbsp; FPS: <b>${currentFps}</b>` +
+        (toggleASL.checked ? ` &nbsp; ASL: <b>${aslLetter}</b>` : "");
+      document.getElementById("liveFps").textContent = currentFps;
+    }
+  } catch (err) {
+    // a single bad frame should never kill the whole tracking loop — log it and keep going
+    console.warn("Frame processing error (skipped):", err);
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// Safety net: if the page closes while the screen is dimmed, try to restore
+// real brightness first. Not 100% guaranteed (async work during unload isn't
+// reliable), but better than leaving your screen dim with no way back.
+window.addEventListener("beforeunload", () => {
+  if (isDimmed && localServerAvailable) {
+    // sendBeacon fires reliably even during page unload, unlike fetch
+    navigator.sendBeacon("/api/brightness", JSON.stringify({ value: originalBrightness != null ? originalBrightness : 1 }));
+  }
+});
+
+setup();
+</script>
+
+</body>
+</html>

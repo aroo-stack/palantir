@@ -1,0 +1,13 @@
+{
+  "name": "gesture-tracker-app",
+  "version": "1.0.0",
+  "description": "Local Node server for the hand/face/body gesture tracker, with real OS-level brightness control — no Electron, no app bundle, no code signing needed",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "brightness": "^3.0.0"
+  }
+}
