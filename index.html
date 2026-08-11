@@ -2853,6 +2853,179 @@ function drawObjectDetections() {
   });
 }
 
+// ---------- OCR: read text from the camera (fully local, tesseract.js) ----------
+// tesseract.js is a pure browser engine (no native deps, no Electron). Its core,
+// worker and English language data are vendored in /vendor/ocr so recognition
+// never touches the network. Capturing every frame would be far too slow, so we
+// grab a small frame every OCR_INTERVAL_MS and only re-detect when the previous
+// job has finished.
+let ocrWorker = null;
+let ocrReady = false;
+let ocrLoading = false;
+let ocrLastRunAt = 0;
+let ocrResult = null;       // { text, words:[{text,bbox}], ts } — last successful read
+let ocrRunInFlight = false;
+const OCR_INTERVAL_MS = 2600;
+const OCR_CAPTURE_W = 640; // downscale captured frame before recognizing (faster)
+const OCR_HISTORY_KEY = "ocr-history";
+let ocrHistory = [];
+
+function loadLocalScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("Failed to load " + src));
+    document.head.appendChild(s);
+  });
+}
+
+// Everything resolves under /vendor/ocr — the local server path (see above).
+async function ensureOcr() {
+  if (ocrWorker) return ocrWorker;
+  if (ocrLoading) return ocrWorker;
+  ocrLoading = true;
+  const status = document.getElementById("ocrStatus");
+  try {
+    if (typeof Tesseract === "undefined") {
+      status.textContent = "Loading OCR engine…";
+      await loadLocalScript("/vendor/ocr/tesseract.min.js");
+    }
+    status.textContent = "Loading OCR language pack… (one time)";
+    ocrWorker = await Tesseract.createWorker("eng", 1, {
+      workerPath: "/vendor/ocr/worker.min.js",
+      corePath: "/vendor/ocr/",
+      langPath: "/vendor/ocr/"
+    });
+    ocrReady = true;
+    status.textContent = "OCR ready — hold text toward the camera.";
+    return ocrWorker;
+  } catch (err) {
+    console.error("OCR load failed:", err);
+    status.textContent = "OCR failed to load: " + (err && err.message ? err.message : err);
+    return null;
+  } finally {
+    ocrLoading = false;
+  }
+}
+
+function loadOcrHistory() {
+  try {
+    const raw = localStorage.getItem(OCR_HISTORY_KEY);
+    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) ocrHistory = p; }
+  } catch (e) { /* corrupt — start fresh */ }
+  renderOcrHistory();
+}
+function saveOcrHistory() {
+  try { localStorage.setItem(OCR_HISTORY_KEY, JSON.stringify(ocrHistory.slice(0, 30))); } catch (e) { /* ignore */ }
+}
+function renderOcrHistory() {
+  const list = document.getElementById("ocrList");
+  list.innerHTML = "";
+  if (!ocrHistory.length) return;
+  [...ocrHistory].reverse().forEach(({ text, ts }) => {
+    const row = document.createElement("div");
+    row.className = "ocr-entry";
+    const t = document.createElement("span");
+    t.className = "ocr-text";
+    t.textContent = text;
+    const time = document.createElement("time");
+    time.textContent = new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const copy = document.createElement("button");
+    copy.className = "small-btn";
+    copy.textContent = "📋";
+    copy.title = "Copy this entry";
+    copy.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(text); };
+    row.append(t, time, copy);
+    list.appendChild(row);
+  });
+}
+function addOcrHistory(text) {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return;
+  if (ocrHistory[0] && ocrHistory[0].text === clean) return; // de-dupe consecutive reads
+  ocrHistory.unshift({ text: clean, ts: Date.now() });
+  saveOcrHistory();
+  renderOcrHistory();
+}
+
+async function runOcrOnce() {
+  if (ocrRunInFlight) return;
+  if (!toggleOCR.checked) return;
+  const worker = await ensureOcr();
+  if (!worker) return;
+  ocrRunInFlight = true;
+  try {
+    // Capture the current camera frame (mirrored canvas is fine — we flip the
+    // boxes back). Downscale to a reasonable width so inference stays snappy.
+    const tmp = document.createElement("canvas");
+    const scale = OCR_CAPTURE_W / canvas.width;
+    tmp.width = OCR_CAPTURE_W;
+    tmp.height = Math.round(canvas.height * scale);
+    const tctx = tmp.getContext("2d");
+    tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
+
+    const { data } = await worker.recognize(tmp);
+    const text = (data && data.text || "").trim();
+    const words = (data && data.words && data.words.length)
+      ? data.words.map(w => ({ text: w.text, bbox: w.bbox }))
+      : [];
+    ocrResult = { text, words, ts: Date.now() };
+
+    const status = document.getElementById("ocrStatus");
+    if (text) {
+      status.textContent = `Read: “${text.slice(0, 60)}”`;
+      addOcrHistory(text);
+    } else if (ocrHistory.length === 0) {
+      status.textContent = "No text detected yet — hold something readable up.";
+    }
+  } catch (err) {
+    console.warn("OCR run failed:", err);
+  } finally {
+    ocrRunInFlight = false;
+  }
+}
+
+// Draws OCR boxes + labels on the overlay. Boxes are in mirrored-canvas space,
+// so the x is flipped to line them up with what the (mirrored) camera shows.
+function drawOcrResult() {
+  if (!toggleOCR.checked || !ocrResult || !ocrResult.words.length) return;
+  const W = canvas.width, H = canvas.height;
+  ocrResult.words.forEach(w => {
+    if (!w.bbox) return;
+    const x0 = (1 - w.bbox.x0) * W;          // flip x for the mirror
+    const y0 = w.bbox.y0 * H;
+    const x1 = (1 - w.bbox.x1) * W;
+    const y1 = w.bbox.y1 * H;
+    ctx.strokeStyle = "rgba(88,166,255,0.9)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    if (w.text) {
+      ctx.font = "600 12px sans-serif";
+      const ty = y0 > 16 ? y0 - 16 : y0;
+      ctx.fillStyle = "rgba(20,24,33,0.85)";
+      ctx.fillRect(x0 - 2, ty, ctx.measureText(w.text).width + 8, 16);
+      ctx.fillStyle = "#58a6ff";
+      ctx.fillText(w.text, x0 + 2, ty + 12);
+    }
+  });
+}
+
+document.getElementById("ocrCopyBtn").addEventListener("click", () => {
+  const text = ocrHistory.map(h => h.text).join("\n");
+  if (!text) return;
+  if (navigator.clipboard) navigator.clipboard.writeText(text);
+});
+document.getElementById("ocrClearBtn").addEventListener("click", () => {
+  ocrHistory = [];
+  saveOcrHistory();
+  renderOcrHistory();
+});
+document.getElementById("ocrSpeakBtn").addEventListener("click", () => {
+  const last = ocrHistory[0] || ocrResult;
+  if (last && last.text) speak(last.text);
+});
+
 btnStageStart.addEventListener("click", () => {
   if (!startBtn.disabled) startBtn.click();
 });
