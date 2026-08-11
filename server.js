@@ -525,6 +525,8 @@ const MIME = {
   ".js": "text/javascript",
   ".wasm": "application/wasm",
   ".task": "application/octet-stream",
+  ".tflite": "application/octet-stream",
+  ".gz": "application/gzip",
   ".json": "application/json",
   ".css": "text/css",
   ".png": "image/png",
