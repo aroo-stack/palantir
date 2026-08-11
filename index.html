@@ -2833,15 +2833,21 @@ async function ensureObjectDetector() {
   try {
     offlineBadge.textContent = "📦 Loading object detector (local file)…";
     const buf = await getModelBuffer("object_model", OBJECT_MODEL_URL, "object detector");
-    objectDetector = await createWithGpuFallback(ObjectDetector, visionResolver, { modelAssetBuffer: buf }, {
+    // This model is int8-quantized, which TFLite only runs on the CPU delegate
+    // (XNNPACK). Trying WEBGPU/GPU first can hang or silently fail on some Macs,
+    // so go straight to CPU — the path proven to work.
+    objectDetector = await ObjectDetector.createFromOptions(visionResolver, {
+      baseOptions: { modelAssetBuffer: buf, delegate: "CPU" },
       runningMode: "VIDEO",
       minDetectionConfidence: 0.45
     });
     offlineBadge.textContent = "💾 All models are local files — no downloads, fully offline";
+    setStatus("Object detector ready — point the camera at something", "ok");
     return true;
   } catch (err) {
     console.error("Object detector failed:", err);
-    voiceStatus.textContent = "Object detector couldn't load: " + (err && err.message ? err.message : err);
+    offlineBadge.textContent = "🛑 Object detector failed to load";
+    setStatus("Object detector couldn't load: " + (err && err.message ? err.message : err), "error");
     return false;
   } finally {
     objectDetectorLoading = false;
