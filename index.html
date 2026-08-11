@@ -2774,7 +2774,8 @@ async function setup() {
 // Object detection is heavier (its own model + inference), so it's created
 // lazily the first time you tick the toggle instead of slowing every startup.
 async function ensureObjectDetector() {
-  if (objectDetector) return true;
+  if (objectDetector || objectDetectorLoading) return !!objectDetector;
+  objectDetectorLoading = true;
   try {
     offlineBadge.textContent = "📦 Loading object detector (local file)…";
     const buf = await getModelBuffer("object_model", OBJECT_MODEL_URL, "object detector");
@@ -2788,6 +2789,8 @@ async function ensureObjectDetector() {
     console.error("Object detector failed:", err);
     voiceStatus.textContent = "Object detector couldn't load: " + (err && err.message ? err.message : err);
     return false;
+  } finally {
+    objectDetectorLoading = false;
   }
 }
 
