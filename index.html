@@ -3396,8 +3396,122 @@ function classifyExpression(blendshapeResult) {
   return "NEUTRAL";
 }
 
+// ---------- Gaze: where your eyes are looking (fully local) ----------
+// The face mesh carries precise iris centres (indices 468 & 473) plus the eye
+// corners, so a gaze direction can be derived from landmarks alone. Only
+// computed when a face is visible and the eyes are open. Direction is smoothed
+// with an exponential moving average so it reads calmly instead of hopping.
+let gazeSmoothX = 0, gazeSmoothY = 0, gazeHasSmooth = false;
+const GAZE_EMA = 0.5;
+
+// Returns { x, y } in roughly -1..1 (x: -1 left .. 1 right; y: -1 up .. 1 down),
+// or null when the eyes can't be resolved (closed / out of frame).
+function computeGaze(lm, lm478 = true) {
+  // Iris centres: right iris = 468, left iris = 473 (MediaPipe 478-point mesh).
+  const irL = lm[468], irR = lm[473];
+  const eyeLOuter = lm[33], eyeLInner = lm[133];   // left eye (mirrored side)
+  const eyeROuter = lm[362], eyeRInner = lm[263];  // right eye (mirrored side)
+  if (!irL || !irR || !eyeLOuter || !eyeLInner || !eyeROuter || !eyeRInner) return null;
+
+  const dLx = eyeLOuter.x - eyeLInner.x;
+  const dLy = eyeLOuter.y - eyeLInner.y;
+  const dRx = eyeROuter.x - eyeRInner.x;
+  const dRy = eyeROuter.y - eyeRInner.y;
+  const lenL = Math.hypot(dLx, dLy), lenR = Math.hypot(dRx, dRy);
+  if (lenL < 1e-4 || lenR < 1e-4) return null;
+
+  // Where the iris sits between the inner and outer eye corner (blink-aware):
+  // 0 = outer corner side, 1 = inner corner side (toward the nose).
+  const l = ((irL.x - eyeLOuter.x) * dLx + (irL.y - eyeLOuter.y) * dLy) / (lenL * lenL);
+  const r = ((irR.x - eyeROuter.x) * dRx + (irR.y - eyeROuter.y) * dRy) / (lenR * lenR);
+  const avg = (l + r) / 2;
+
+  // Horizontal: l and r are both ~0.5 dead-centre. Looking toward our right
+  // (their left) pushes both toward the nose.
+  const x = (avg - 0.5) * 2 * 3.0;
+  // Vertical: use the position of the eyes vs the iris across both eyes.
+  const eyeMidY = ((eyeLOuter.y + eyeLInner.y) / 2 + (eyeROuter.y + eyeRInner.y) / 2) / 2;
+  const irMidY = (irL.y + irR.y) / 2;
+  const y = (eyeMidY - irMidY) * 8.0;
+
+  return {
+    x: Math.max(-1.2, Math.min(1.2, x)),
+    y: Math.max(-1.2, Math.min(1.2, y)),
+    irLeft: { x: irL.x, y: irL.y },
+    irRight: { x: irR.x, y: irR.y }
+  };
+}
+
+// Draws an overlay that makes the gaze visible: the computed direction as a
+// glowing arrow from the face, plus dots marking each iris.
+function drawGazeOverlay(lm, gaze) {
+  const W = canvas.width, H = canvas.height;
+  if (gaze && gaze.irLeft && gaze.irRight) {
+    ["irLeft", "irRight"].forEach(key => {
+      const p = gaze[key];
+      ctx.beginPath();
+      ctx.arc(p.x * W, p.y * H, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#7fd0ff";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#0b0d12";
+      ctx.stroke();
+    });
+  }
+
+  // Face centre (nose) is the origin of the gaze arrow.
+  const nose = lm[1];
+  const cx = nose.x * W, cy = nose.y * H;
+  const dirX = gazeSmoothX, dirY = gazeSmoothY;
+  const len = Math.min(W, H) * 0.13;
+  const ex = cx + dirX * len;
+  const ey = cy + dirY * len;
+
+  ctx.save();
+  ctx.translate(W, 0);
+  ctx.scale(-1, 1); // undo the CSS mirror so the arrow reads in true screen space
+
+  ctx.strokeStyle = "rgba(127, 208, 255, 0.85)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(W - cx, cy);
+  ctx.lineTo(W - ex, ey);
+  ctx.stroke();
+
+  // Arrowhead.
+  const ang = Math.atan2(ey - cy, ex - cx);
+  const ah = 8;
+  ctx.fillStyle = "#7fd0ff";
+  ctx.beginPath();
+  ctx.moveTo(W - (ex + Math.cos(ang) * ah), ey + Math.sin(ang) * ah);
+  ctx.lineTo(W - (ex + Math.cos(ang + 2.5) * ah), ey + Math.sin(ang + 2.5) * ah);
+  ctx.lineTo(W - (ex + Math.cos(ang - 2.5) * ah), ey + Math.sin(ang - 2.5) * ah);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Text label (drawn unmirrored so it reads correctly).
+  const dirLabel =
+    Math.abs(dirX) < 0.18 && Math.abs(dirY) < 0.18 ? "center" :
+    (Math.abs(dirY) > Math.abs(dirX)
+      ? (dirY < 0 ? "up" : "down")
+      : (dirX < 0 ? "left" : "right"));
+  ctx.font = "600 11px sans-serif";
+  ctx.fillStyle = "rgba(127,208,255,0.95)";
+  ctx.fillText("gaze: " + dirLabel, 10, H - 10);
+}
+
 function drawHand(lm) {
   Object.values(FINGERS).forEach(finger => {
+    ctx.strokeStyle = finger.color;
+    ctx.lineWidth = 3;
+    for (let i = 0; i < finger.chain.length - 1; i++) {
+      const a = lm[finger.chain[i]], b = lm[finger.chain[i + 1]];
+      ctx.beginPath();
+      ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
+      ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
+      ctx.stroke();
+    }
     finger.chain.forEach(i => {
       const p = lm[i];
       ctx.beginPath();
