@@ -78,6 +78,32 @@ body {
 .badge.privacy { border-color: rgba(55, 211, 162, 0.35); color: #8ff0cf; }
 .badge.offline { border-color: rgba(255, 196, 77, 0.35); color: #ffe0a1; }
 
+.topnav {
+  position: sticky; top: 0; z-index: 40;
+  width: min(760px, 94vw);
+  display: flex; gap: 4px; overflow-x: auto;
+  padding: 8px 0; margin-bottom: 18px;
+  background: linear-gradient(180deg, rgba(7, 9, 14, 0.92), rgba(7, 9, 14, 0.72));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 999px;
+  scrollbar-width: none;
+}
+.topnav::-webkit-scrollbar { display: none; }
+.topnav a {
+  text-decoration: none; white-space: nowrap;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.2px;
+  color: var(--muted);
+  padding: 7px 14px; border-radius: 999px;
+  transition: all 0.16s;
+}
+.topnav a:hover { color: var(--text); background: rgba(90, 162, 255, 0.1); }
+.topnav a.active {
+  color: #bfe4ff;
+  background: rgba(90, 162, 255, 0.14);
+  border: 1px solid rgba(90, 162, 255, 0.35);
+}
+@media (min-width: 640px) { .topnav { justify-content: space-between; } }
+
 .stage {
   position: relative;
   width: min(760px, 94vw);
