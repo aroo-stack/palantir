@@ -779,6 +779,27 @@ const drawingUtils = new DrawingUtils(ctx);
 const statusEl = document.getElementById("status");
 const readoutEl = document.getElementById("readout");
 const startBtn = document.getElementById("startBtn");
+const topnav = document.getElementById("topnav");
+if (topnav) {
+  topnav.addEventListener("click", (e) => {
+    const link = e.target.closest("a[data-scroll]");
+    if (!link) return;
+    e.preventDefault();
+    const target = document.getElementById(link.dataset.scroll);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  const navLinks = [...topnav.querySelectorAll("a[data-scroll]")];
+  const onScroll = () => {
+    let active = navLinks[0] ? navLinks[0].dataset.scroll : null;
+    for (const l of navLinks) {
+      const el = document.getElementById(l.dataset.scroll);
+      if (el && el.getBoundingClientRect().top <= 160) active = l.dataset.scroll;
+    }
+    for (const l of navLinks) l.classList.toggle("active", l.dataset.scroll === active);
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+}
 function setStatus(text, mode) {
   statusEl.classList.remove("armed", "busy", "ok", "error");
   if (mode) statusEl.classList.add(mode);
