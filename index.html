@@ -2984,16 +2984,17 @@ async function runOcrOnce() {
   }
 }
 
-// Draws OCR boxes + labels on the overlay. Boxes are in mirrored-canvas space,
-// so the x is flipped to line them up with what the (mirrored) camera shows.
+// Draws OCR boxes + labels on the overlay. Boxes are in camera space (same as
+// object detection): the CSS mirror flips the buffer for display, so we write
+// the raw normalized coords, exactly like drawObjectDetections does.
 function drawOcrResult() {
   if (!toggleOCR.checked || !ocrResult || !ocrResult.words.length) return;
   const W = canvas.width, H = canvas.height;
   ocrResult.words.forEach(w => {
     if (!w.bbox) return;
-    const x0 = (1 - w.bbox.x0) * W;          // flip x for the mirror
+    const x0 = w.bbox.x0 * W;
     const y0 = w.bbox.y0 * H;
-    const x1 = (1 - w.bbox.x1) * W;
+    const x1 = w.bbox.x1 * W;
     const y1 = w.bbox.y1 * H;
     ctx.strokeStyle = "rgba(88,166,255,0.9)";
     ctx.lineWidth = 2;
