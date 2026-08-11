@@ -2341,10 +2341,6 @@ const reminderId = { n: 0 };
 let reminders = [];
 let reminderTick = null;
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 function parseReminder(raw) {
   const e = expandNumberWords(raw.replace(/\s+/g, " ").trim().toLowerCase());
   if (!/\b(remind|reminder|timer)\b/.test(e)) return null;
