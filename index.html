@@ -3662,6 +3662,18 @@ function loop() {
           lastFaceRatio = (box.x2 - box.x1) / canvas.width;
           drawCornerBox(box, EXPRESSION_COLORS[expression] || EXPRESSION_COLORS.NEUTRAL);
 
+          // Gaze: smoothed direction + visible overlay (only when the eyes are open).
+          const eyesOpen = !leftEyeClosed && !rightEyeClosed;
+          const gaze = toggleGaze.checked && eyesOpen ? computeGaze(lm) : null;
+          if (gaze) {
+            gazeSmoothX = gazeHasSmooth ? gazeSmoothX * (1 - GAZE_EMA) + gaze.x * GAZE_EMA : gaze.x;
+            gazeSmoothY = gazeHasSmooth ? gazeSmoothY * (1 - GAZE_EMA) + gaze.y * GAZE_EMA : gaze.y;
+            gazeHasSmooth = true;
+            drawGazeOverlay(lm, gaze);
+          } else {
+            gazeSmoothX = 0; gazeSmoothY = 0;
+          }
+
           const nose = lm[1];
           hudReadout.style.display = "block";
           hudPerson.textContent = "DETECTED";
