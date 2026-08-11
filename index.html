@@ -2671,58 +2671,6 @@ function toggleSkeletonMode() {
       : "Tracking live", "ok");
 }
 
-// ---------- Right-hand fist → lock screen (real, via the local server) ----------
-// Hold your right hand still in a fist for a moment and the screen locks.
-// Closing both fists at once still means the skeleton-mode gesture, so the
-// lock is skipped when the left hand is also in a fist.
-let rightFistSince = null;
-let lastRightFistLockTime = 0;
-const RIGHT_FIST_HOLD_MS = 800;        // hold the fist this long before locking — avoids accidental triggers
-const RIGHT_FIST_LOCK_COOLDOWN_MS = 6000; // long cooldown since this is a dramatic, real action
-
-function handIsRight(lm, handedness) {
-  if (handedness && handedness[0]) return handedness[0].categoryName === "Right";
-  return lm[0].x < 0.5; // fallback if handedness is missing: in the raw (unmirrored) frame the user's right hand is camera-left
-}
-
-function rightFistActive(handResult) {
-  if (!localServerAvailable || !handResult || !handResult.landmarks || handResult.landmarks.length === 0) return false;
-  let rightFist = false;
-  let leftHandFist = false;
-  handResult.landmarks.forEach((lm, i) => {
-    const handedness = handResult.handedness && handResult.handedness[i] && handResult.handedness[i][0];
-    if (handIsRight(lm, handedness)) {
-      if (isFist(lm)) rightFist = true;
-    } else {
-      if (isFist(lm)) leftHandFist = true;
-    }
-  });
-  return rightFist && !leftHandFist;
-}
-
-function checkRightFistLock(handResult, now) {
-  if (!rightFistActive(handResult)) {
-    rightFistSince = null;
-    return;
-  }
-  if (rightFistSince === null) rightFistSince = now;
-  if (now - rightFistSince > RIGHT_FIST_HOLD_MS && now - lastRightFistLockTime > RIGHT_FIST_LOCK_COOLDOWN_MS) {
-    lastRightFistLockTime = now;
-    rightFistSince = null; // needs a fresh hold before it can fire again
-    triggerLockScreen();
-  }
-}
-
-async function triggerLockScreen() {
-  setStatus("Locking screen...", "busy");
-  speak("Locking screen");
-  try {
-    await fetch("/api/lock", { method: "POST" });
-  } catch (e) {
-    console.warn("Lock screen failed:", e);
-  }
-}
-
 // ---------- Wellbeing reminders (all computed from the live local face mesh) ----------
 let lastFaceRatio = null; // face width / frame width — proxy for "how close you are"
 let faceNearSince = null;
