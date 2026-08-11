@@ -810,6 +810,7 @@ let faceLandmarker = null;
 let poseLandmarker = null;
 let visionResolver = null; // shared FilesetResolver, reused by the object detector
 let objectDetector = null;
+let objectDetectorLoading = false;
 let objectDetectResult = null;   // last detections (kept so the box persists between model runs)
 let lastObjectDetectAt = 0;
 let running = false;
