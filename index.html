@@ -2956,14 +2956,17 @@ async function runOcrOnce() {
   if (!worker) return;
   ocrRunInFlight = true;
   try {
-    // Capture the current camera frame (mirrored canvas is fine — we flip the
-    // boxes back). Downscale to a reasonable width so inference stays snappy.
+    // Capture the raw camera frame (the video element is the unmirrored feed —
+    // same space as the landmark/object boxes → no flip needed when drawing).
+    // Using the video (not the annotated overlay canvas) keeps the tracked
+    // skeleton / HUD / labels from being read as "text" by the OCR.
+    if (!video.videoWidth) return;
     const tmp = document.createElement("canvas");
-    const scale = OCR_CAPTURE_W / canvas.width;
+    const scale = OCR_CAPTURE_W / video.videoWidth;
     tmp.width = OCR_CAPTURE_W;
-    tmp.height = Math.round(canvas.height * scale);
+    tmp.height = Math.round(video.videoHeight * scale);
     const tctx = tmp.getContext("2d");
-    tctx.drawImage(canvas, 0, 0, tmp.width, tmp.height);
+    tctx.drawImage(video, 0, 0, tmp.width, tmp.height);
 
     const { data } = await worker.recognize(tmp);
     const text = (data && data.text || "").trim();
