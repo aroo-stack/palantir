@@ -3592,6 +3592,21 @@ let lastHandResult = null, lastFaceResult = null, lastPoseResult = null;
 let detectionFrameCounter = 0;
 const DETECTION_INTERVAL = 2; // run the actual models every 2nd new video frame — halves the compute load; drawing still updates every frame using the last known result
 
+// Lightweight temporal smoothing for hands (and fixed-order landmarks) so the
+// skeleton reads steady instead of hopping frame to frame. Faces already blend
+// via the 3D-scan lerp; hands get a straight exponential moving average. Only
+// applied to the draw path, never to the raw results used by gesture logic.
+let handSmoothLm = null;
+const LM_EMA = 0.35;
+function smoothLandmarks(raw, smooth) {
+  if (!raw) return null;
+  if (!smooth || smooth.length !== raw.length) return raw.map(p => ({ x: p.x, y: p.y, z: p.z }));
+  return raw.map((p, i) => {
+    const s = smooth[i];
+    return { x: s.x + (p.x - s.x) * LM_EMA, y: s.y + (p.y - s.y) * LM_EMA, z: s.z + (p.z - s.z) * LM_EMA };
+  });
+}
+
 function loop() {
   if (!running) return;
   const now = performance.now();
