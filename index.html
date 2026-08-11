@@ -203,6 +203,11 @@ body {
   color: var(--muted);
   display: flex; align-items: center; gap: 8px;
 }
+.card-title::before {
+  content: "◈"; display: inline-block;
+  width: 16px; text-align: center;
+  font-size: 12px; opacity: 0.85;
+}
 .card-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
 .row { display: flex; align-items: center; gap: 12px; }
 .key-hint { font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
