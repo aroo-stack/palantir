@@ -114,3 +114,10 @@ if you want that built out.
 edit to settle, commits with an `auto-sync` message, and pushes to the
 private GitHub repo. Nothing to do on your side. `node_modules/` and logs
 are git-ignored — after cloning, run `npm install` once.
+
+## Object detection (local)
+
+Tick "Detect objects" in the Tracking card and hold up a phone, book, bottle,
+etc. — a yellow box with the label (COCO classes, incl. book & cell phone) is
+drawn over the live camera feed. Model: MediaPipe EfficientDet-Lite0 (int8),
+vendored in `models/`, fully offline.
