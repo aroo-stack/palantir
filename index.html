@@ -2976,8 +2976,10 @@ async function runOcrOnce() {
     if (text) {
       status.textContent = `Read: “${text.slice(0, 60)}”`;
       addOcrHistory(text);
-    } else if (ocrHistory.length === 0) {
-      status.textContent = "No text detected yet — hold something readable up.";
+    } else {
+      status.textContent = ocrHistory.length
+        ? "Hold text up and I'll read it (last saved: “" + ocrHistory[0].text.slice(0, 40) + "”…)"
+        : "No text detected yet — hold something readable up.";
     }
   } catch (err) {
     console.warn("OCR run failed:", err);
