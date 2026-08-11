@@ -393,6 +393,24 @@ body {
 .macro-step .step-value { flex: 1; min-width: 0; }
 .macro-step .step-remove { flex: 0 0 auto; }
 
+.playlist-remember {
+  margin-top: 12px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 12px;
+  border: 1px solid rgba(55, 211, 162, 0.22);
+  border-radius: 10px;
+  background: rgba(55, 211, 162, 0.05);
+}
+.playlist-remember label { font-size: 12px; font-weight: 600; color: #8ff0cf; white-space: nowrap; }
+.playlist-remember input[type="text"] {
+  flex: 1; min-width: 200px;
+  background: rgba(6, 10, 17, 0.6); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-size: 12.5px;
+}
+.playlist-remember input[type="text"]:focus { outline: none; border-color: var(--border-strong); }
+.playlist-remember .saved-note { font-size: 11px; color: var(--muted); }
+
 #scanCanvas {
   width: 100%; aspect-ratio: 1 / 1;
   background: radial-gradient(circle at 50% 38%, #0b1424 0%, #05070c 72%);
@@ -725,6 +743,11 @@ body {
         <div class="hint" id="macroStatus"></div>
       </div>
     </details>
+    <div class="playlist-remember">
+      <label for="playlistUrlInput">🎶 Party-time playlist</label>
+      <input type="text" id="playlistUrlInput" placeholder="Paste a Spotify playlist link — used by “party time”">
+      <button id="playlistSaveBtn" class="small-btn">Remember</button>
+    </div>
   </div>
 
   <div class="card" id="card-wellbeing">
@@ -1023,6 +1046,8 @@ async function loadVoiceList() {
 
 async function speak(text) {
   if (!localServerAvailable) return;
+  lastSpoken.words = wordsOf(text);   // remember what we said — used to ignore our own echo
+  lastSpoken.at = performance.now();
   speakSuppressUntil = performance.now() + SPEAK_SUPPRESS_MS;
   try {
     await fetch("/api/speak", {
@@ -1403,10 +1428,32 @@ function normalizeAppName(raw) {
 const lastHandled = { text: "", at: 0 };
 const LAST_HANDLED_WINDOW_MS = 4000;
 
+// ---------- Own-voice echo guard ----------
+// Jarvis's TTS reply plays out of the Mac speakers, the mic hears it, and
+// it gets recognized as a new "command" — which is what made `party time`
+// fire over and over. Remember the words we last spoke: if a recognized
+// utterance overlaps those words by ~60% within a few seconds, it's our own
+// voice echoing back, so swallow it.
+let lastSpoken = { words: new Set(), at: 0 };
+const OWN_VOICE_WINDOW_MS = 6000;
+const OWN_VOICE_OVERLAP = 0.6;
+function wordsOf(s) {
+  return new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean));
+}
+function isOwnVoice(t, nowTs) {
+  if (nowTs - lastSpoken.at > OWN_VOICE_WINDOW_MS) return false;
+  const said = wordsOf(t);
+  if (said.size === 0 || lastSpoken.words.size === 0) return false;
+  let overlap = 0;
+  for (const w of said) if (lastSpoken.words.has(w)) overlap++;
+  return overlap / said.size >= OWN_VOICE_OVERLAP;
+}
+
 async function handleSpeechText(transcript) {
   const t = transcript.replace(/\s+/g, " ").trim().toLowerCase();
   if (!t) return;
   const nowTs = performance.now();
+  if (isOwnVoice(t, nowTs)) return; // heard Jarvis's own reply through the mic
   if (t === lastHandled.text && nowTs - lastHandled.at < LAST_HANDLED_WINDOW_MS) return;
   lastHandled.text = t;
   lastHandled.at = nowTs;
@@ -1795,7 +1842,7 @@ const DEFAULT_MACROS = [
   { phrase: "party time", steps: [
     { type: "open", value: "Spotify" },
     { type: "volume", value: "100" },
-    { type: "playlist", value: "Liked Songs" },
+    { type: "playlist", value: "https://open.spotify.com/playlist/37i9dQZF1EIeXVd9c2ss7N" },
     { type: "speak", value: "Party time! Enjoy the music, sir." }
   ]},
   { phrase: "movie night", steps: [
@@ -1836,6 +1883,14 @@ const DEFAULT_MACROS = [
 
 const MACROS_KEY = "jarvis-macros-v4";
 const MACROS_KEY_LEGACY = "jarvis-macros-v3";
+// Saved Spotify playlist for "party time". Liked Songs needs the user's Spotify
+// username, which AppleScript often can't read, so we remember an explicit
+// playlist link instead and play it every time.
+const PLAYLIST_KEY = "jarvis-party-playlist";
+const DEFAULT_PARTY_PLAYLIST = "https://open.spotify.com/playlist/37i9dQZF1EIeXVd9c2ss7N";
+function partyPlaylistUrl() {
+  return localStorage.getItem(PLAYLIST_KEY) || DEFAULT_PARTY_PLAYLIST;
+}
 let macros = [];
 let macroEditingId = null;
 
@@ -1844,7 +1899,7 @@ function loadMacros() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) { macros = parsed; return; }
+      if (Array.isArray(parsed)) { macros = parsed; migratePartyMacro(); return; }
     } catch (e) { /* corrupt — fall back to defaults */ }
   }
   // First run with the new key: seed the expanded defaults, then carry over any
@@ -1861,12 +1916,52 @@ function loadMacros() {
       for (const extra of byPhrase.values()) macros.push(extra);
     }
   } catch (e) { /* legacy read failed — defaults are fine */ }
+  migratePartyMacro();
   saveMacros();
+}
+
+// Point the "party time" macro's playlist step at the remembered Spotify link
+// (Liked Songs can't be played without the user's username, which failed).
+function migratePartyMacro() {
+  const url = partyPlaylistUrl();
+  for (const m of macros) {
+    if (String(m.phrase).toLowerCase() !== "party time") continue;
+    for (const step of (m.steps || [])) {
+      if (step.type === "playlist") step.value = url;
+    }
+  }
 }
 
 function saveMacros() {
   try { localStorage.setItem(MACROS_KEY, JSON.stringify(macros)); } catch (e) { console.warn("Couldn't save macros:", e); }
   renderMacros();
+}
+
+// "Party time" playlist link — paste a Spotify URL and it's remembered in
+// localStorage, then used every time the macro runs.
+function initPlaylistRemember() {
+  const input = document.getElementById("playlistUrlInput");
+  const btn = document.getElementById("playlistSaveBtn");
+  if (!input || !btn) return;
+  input.value = partyPlaylistUrl();
+  const note = document.createElement("span");
+  note.className = "saved-note";
+  btn.after(note);
+  const flash = (msg) => { note.textContent = msg; setTimeout(() => { note.textContent = ""; }, 2500); };
+  const save = () => {
+    let v = input.value.trim();
+    if (!v) { flash("Link cleared — party time will use the default"); return; }
+    if (!/open\.spotify\.com\//i.test(v) && !/^spotify:/i.test(v)) {
+      flash("That doesn't look like a Spotify link");
+      return;
+    }
+    localStorage.setItem(PLAYLIST_KEY, v);
+    migratePartyMacro();
+    saveMacros();
+    flash("Saved — party time will play this playlist");
+  };
+  btn.addEventListener("click", save);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
 }
 
 function escapeRegExp(s) {
@@ -2051,9 +2146,12 @@ async function runMacro(m) {
           controlMedia(String(step.value).toLowerCase(), null);
           break;
         case "playlist": {
-          const v = String(step.value).trim();
-          const isSpotify = /^spotify:/i.test(v) || /open\.spotify\.com\//i.test(v) || /\bspotify\b/i.test(v);
+          let v = String(step.value).trim();
           const liked = /liked songs|saved songs|my music|^likes$/i.test(v);
+          // "Liked Songs" needs a Spotify username AppleScript often can't read.
+          // If one is remembered (or a liked keyword is used), play the link.
+          if (liked) v = partyPlaylistUrl();
+          const isSpotify = /^spotify:/i.test(v) || /open\.spotify\.com\//i.test(v) || /\bspotify\b/i.test(v);
           voiceStatus.textContent = "Playing playlist…";
           try {
             const r = await fetch("/api/media", {
@@ -3071,6 +3169,7 @@ loadMacros();
 loadOcrHistory();
 renderMacros();
 setupMacroEditor();
+initPlaylistRemember();
 
 document.addEventListener("keydown", (ev) => {
   if (ev.repeat) return;
