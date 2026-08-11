@@ -3714,9 +3714,11 @@ function loop() {
       if (handResult && handResult.landmarks) {
         handResult.landmarks.forEach((lm, i) => {
           handCount++;
-          drawHand(lm);
+          // Smoothed copy for drawing only; gesture logic still uses raw lm.
+          handSmoothLm = smoothLandmarks(lm, handSmoothLm);
+          drawHand(handSmoothLm || lm);
           if (toggleASL.checked && i === 0) {
-            aslLetter = classifyASLLetter(lm);
+            aslLetter = classifyASLLetter(handSmoothLm || lm);
           }
           if (isWebSlingerSign(lm)) webSlingerActive = true;
           if (i === 0) checkPinchOpen(lm, now);
@@ -3724,6 +3726,8 @@ function loop() {
           if (i === 0) checkVolumeGesture(lm, now);
           if (i === 0) checkBrightnessVoiceGesture(lm, now);
         });
+      } else {
+        handSmoothLm = null;
       }
       if (webSlingerActive && currentFaceLmForMask) drawWebMask(currentFaceLmForMask);
 
