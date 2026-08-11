@@ -3875,7 +3875,6 @@ function loop() {
       }
 
       if (handResult && handResult.landmarks) checkBothFists(handResult.landmarks, now);
-      if (handResult && handResult.landmarks) checkRightFistLock(handResult, now);
       if (triggerJustHappened) {
         triggerJustHappened = false;
         toggleSkeletonMode();
