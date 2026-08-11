@@ -3982,7 +3982,8 @@ function loop() {
 
       readoutEl.innerHTML =
         `Hands: <b>${handCount}</b> &nbsp; Face: <b>${faceCount}</b> &nbsp; Body: <b>${poseCount}</b> people &nbsp; FPS: <b>${currentFps}</b>` +
-        (toggleASL.checked ? ` &nbsp; ASL: <b>${aslLetter}</b>` : "");
+        (toggleASL.checked ? ` &nbsp; ASL: <b>${aslLetter}</b>` : "") +
+        (toggleObject.checked ? ` &nbsp; Objects: <b>${objectDetectResult ? objectDetectResult.length : "…"}</b>` : "");
       document.getElementById("liveFps").textContent = currentFps;
     }
   } catch (err) {
