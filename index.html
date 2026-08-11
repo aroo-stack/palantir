@@ -2739,6 +2739,7 @@ async function setup() {
     const vision = await FilesetResolver.forVisionTasks(
       "/vendor/wasm"
     );
+    visionResolver = vision;
 
     const handBuf = await getModelBuffer("hand_model", HAND_MODEL_URL, "hand model");
     handLandmarker = await createWithGpuFallback(HandLandmarker, vision, { modelAssetBuffer: handBuf }, {
@@ -2769,6 +2770,58 @@ async function setup() {
     setStatus("Failed to load tracking engines: " + (err && err.message ? err.message : err), "error");
     offlineBadge.textContent = "💾 Setup error — see status message";
   }
+}
+
+// Object detection is heavier (its own model + inference), so it's created
+// lazily the first time you tick the toggle instead of slowing every startup.
+async function ensureObjectDetector() {
+  if (objectDetector) return true;
+  try {
+    offlineBadge.textContent = "📦 Loading object detector (local file)…";
+    const buf = await getModelBuffer("object_model", OBJECT_MODEL_URL, "object detector");
+    objectDetector = await createWithGpuFallback(ObjectDetector, visionResolver, { modelAssetBuffer: buf }, {
+      runningMode: "VIDEO",
+      minDetectionConfidence: 0.45
+    });
+    offlineBadge.textContent = "💾 All models are local files — no downloads, fully offline";
+    return true;
+  } catch (err) {
+    console.error("Object detector failed:", err);
+    voiceStatus.textContent = "Object detector couldn't load: " + (err && err.message ? err.message : err);
+    return false;
+  }
+}
+
+// Draws a labelled box around every detected object. The overlay canvas is
+// CSS-mirrored like the landmarks, so raw normalized coordinates work as-is.
+function drawObjectDetections() {
+  const detections = objectDetectResult;
+  if (!detections || !detections.length) return;
+  const W = canvas.width, H = canvas.height;
+  detections.forEach(d => {
+    const b = d.boundingBox;
+    const x = b.originX * W, y = b.originY * H, w = b.width * W, h = b.height * H;
+    const cat = d.categories && d.categories[0];
+    const label = cat ? cat.categoryName : "object";
+    const score = cat ? Math.round(cat.score * 100) : 0;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#f0d000";
+    ctx.stroke();
+    if (label) {
+      ctx.font = "600 13px sans-serif";
+      const text = `${label} ${score}%`;
+      const tw = ctx.measureText(text).width + 12;
+      const ty = y > 18 ? y - 18 : y;
+      ctx.fillStyle = "#f0d000";
+      ctx.fillRect(x, ty, tw, 18);
+      ctx.fillStyle = "#0b0d12";
+      ctx.fillText(text, x + 6, ty + 13);
+    }
+    ctx.restore();
+  });
 }
 
 btnStageStart.addEventListener("click", () => {
