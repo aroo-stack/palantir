@@ -2720,18 +2720,20 @@ async function getModelBuffer(key, url, label) {
 // doesn't support it — GPU delegate support isn't universal, and silently hanging
 // here (as an earlier version of this file did) looks exactly like "nothing works."
 async function createWithGpuFallback(ClassRef, vision, baseOptionsExtra, otherOptions) {
-  try {
-    return await ClassRef.createFromOptions(vision, {
-      baseOptions: { ...baseOptionsExtra, delegate: "GPU" },
-      ...otherOptions
-    });
-  } catch (gpuErr) {
-    console.warn("GPU delegate failed, retrying with CPU:", gpuErr);
-    return await ClassRef.createFromOptions(vision, {
-      baseOptions: { ...baseOptionsExtra, delegate: "CPU" },
-      ...otherOptions
-    });
+  // Try the fastest accelerators first — WebGPU when the browser has it, then
+  // GPU, then CPU. MediaPipe ships task runners that all take a delegate flag,
+  // so a single helper covers every landmarker + the object detector.
+  for (const delegate of ["WEBGPU", "GPU", "CPU"]) {
+    try {
+      return await ClassRef.createFromOptions(vision, {
+        baseOptions: { ...baseOptionsExtra, delegate },
+        ...otherOptions
+      });
+    } catch (delegateErr) {
+      console.warn(`${delegate} delegate failed, trying next:`, delegateErr);
+    }
   }
+  throw new Error("All delegates failed for " + (ClassRef && ClassRef.name || "task"));
 }
 
 async function setup() {
