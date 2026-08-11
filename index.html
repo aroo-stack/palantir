@@ -782,7 +782,7 @@ const btnStageStart = document.getElementById("btnStageStart");
 // the first draw is safe.
 const PERSIST_TOGGLES = [
   "toggleHand", "toggleFace", "toggleBody", "toggleLabels", "toggleAngles",
-  "toggleASL", "togglePinchOpen", "toggleBrightnessPinch", "toggleVoice", "toggleWellbeing"
+  "toggleASL", "toggleObject", "togglePinchOpen", "toggleBrightnessPinch", "toggleVoice", "toggleWellbeing"
 ];
 PERSIST_TOGGLES.forEach(id => {
   const el = document.getElementById(id);
@@ -806,6 +806,10 @@ const STORE_NAME = "models";
 let handLandmarker = null;
 let faceLandmarker = null;
 let poseLandmarker = null;
+let visionResolver = null; // shared FilesetResolver, reused by the object detector
+let objectDetector = null;
+let objectDetectResult = null;   // last detections (kept so the box persists between model runs)
+let lastObjectDetectAt = 0;
 let running = false;
 let lastVideoTime = -1;
 let fpsFrames = 0;
