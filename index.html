@@ -3591,6 +3591,8 @@ function loop() {
       }
       if (webSlingerActive && currentFaceLmForMask) drawWebMask(currentFaceLmForMask);
 
+      if (toggleObject.checked) drawObjectDetections();
+
       updateWellbeing(now);
 
       spellingPanel.style.display = toggleASL.checked ? "flex" : "none";
