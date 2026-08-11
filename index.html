@@ -702,6 +702,7 @@ import {
   HandLandmarker,
   FaceLandmarker,
   PoseLandmarker,
+  ObjectDetector,
   FilesetResolver,
   DrawingUtils
 } from "./vendor/vision_bundle.mjs";
@@ -796,6 +797,7 @@ PERSIST_TOGGLES.forEach(id => {
 const HAND_MODEL_URL = "/models/hand_landmarker.task";
 const FACE_MODEL_URL = "/models/face_landmarker.task";
 const POSE_MODEL_URL = "/models/pose_landmarker_lite.task";
+const OBJECT_MODEL_URL = "/models/efficientdet_lite0.tflite";
 const DB_NAME = "gesture-app-cache";
 const STORE_NAME = "models";
 
