@@ -2860,7 +2860,6 @@ function drawObjectDetections() {
 // grab a small frame every OCR_INTERVAL_MS and only re-detect when the previous
 // job has finished.
 let ocrWorker = null;
-let ocrReady = false;
 let ocrLoading = false;
 let ocrLastRunAt = 0;
 let ocrResult = null;       // { text, words:[{text,bbox}], ts } — last successful read
@@ -2897,7 +2896,6 @@ async function ensureOcr() {
       corePath: "/vendor/ocr/",
       langPath: "/vendor/ocr/"
     });
-    ocrReady = true;
     status.textContent = "OCR ready — hold text toward the camera.";
     return ocrWorker;
   } catch (err) {
