@@ -17,7 +17,7 @@ diff() {
 
 push_pending() {
   # push anything committed but not yet on GitHub (retries forever)
-  if [ "$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 1)" -gt 0 ]; then
+  if [ "$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 1)" -gt 0 ]; then
     git push 2>>sync.log && echo "[$(date '+%H:%M:%S')] pushed pending commits" || echo "[$(date '+%H:%M:%S')] push failed (will retry)"
   fi
 }
