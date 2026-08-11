@@ -3508,6 +3508,14 @@ function loop() {
         lastHandResult = handResult;
         lastFaceResult = faceResult;
         lastPoseResult = poseResult;
+        if (toggleObject.checked && now - lastObjectDetectAt > 350) {
+          if (objectDetector) {
+            objectDetectResult = objectDetector.detectForVideo(video, now).detections;
+            lastObjectDetectAt = now;
+          } else {
+            ensureObjectDetector();
+          }
+        }
       }
 
       if (handResult && handResult.landmarks) checkBothFists(handResult.landmarks, now);
