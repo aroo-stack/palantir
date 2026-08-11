@@ -3398,15 +3398,6 @@ function classifyExpression(blendshapeResult) {
 
 function drawHand(lm) {
   Object.values(FINGERS).forEach(finger => {
-    ctx.strokeStyle = finger.color;
-    ctx.lineWidth = 3;
-    for (let i = 0; i < finger.chain.length - 1; i++) {
-      const a = lm[finger.chain[i]], b = lm[finger.chain[i + 1]];
-      ctx.beginPath();
-      ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
-      ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
-      ctx.stroke();
-    }
     finger.chain.forEach(i => {
       const p = lm[i];
       ctx.beginPath();
