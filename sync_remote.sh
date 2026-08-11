@@ -6,6 +6,9 @@
 
 cd "$(dirname "$0")"
 
+# don't let git nag about ignored files (node_modules, logs) on every auto-add
+git config advice.addIgnoredFile false 2>/dev/null
+
 POLL_SECONDS=6
 
 diff() {
