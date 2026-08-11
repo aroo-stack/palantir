@@ -3417,10 +3417,10 @@ function computeGaze(lm, lm478 = true) {
   const eyeROuter = lm[362], eyeRInner = lm[263];  // right eye (mirrored side)
   if (!irL || !irR || !eyeLOuter || !eyeLInner || !eyeROuter || !eyeRInner) return null;
 
-  const dLx = eyeLOuter.x - eyeLInner.x;
-  const dLy = eyeLOuter.y - eyeLInner.y;
-  const dRx = eyeROuter.x - eyeRInner.x;
-  const dRy = eyeROuter.y - eyeRInner.y;
+  const dLx = eyeLInner.x - eyeLOuter.x;
+  const dLy = eyeLInner.y - eyeLOuter.y;
+  const dRx = eyeRInner.x - eyeROuter.x;
+  const dRy = eyeRInner.y - eyeROuter.y;
   const lenL = Math.hypot(dLx, dLy), lenR = Math.hypot(dRx, dRy);
   if (lenL < 1e-4 || lenR < 1e-4) return null;
 
