@@ -8,6 +8,10 @@ cd "$(dirname "$0")"
 
 echo "Starting Gesture Tracker..."
 
+# keep the GitHub repo in sync automatically (commits + pushes changes)
+nohup ./sync_remote.sh >> sync.log 2>&1 &
+echo "Git auto-sync running"
+
 # start the server in the background
 node server.js &
 SERVER_PID=$!
