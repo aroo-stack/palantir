@@ -1,0 +1,9 @@
+# macOS cruft
+.DS_Store
+
+# dependencies — restored with `npm install`
+node_modules/
+
+# logs
+server.log
+sync.log
