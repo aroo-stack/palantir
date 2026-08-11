@@ -541,7 +541,7 @@ body {
 
   <div class="reminders" id="remindersPanel" style="display:none;"></div>
 
-  <div class="card">
+  <div class="card" id="card-tracking">
     <div class="card-title">Tracking</div>
     <div class="pills">
       <label class="tl"><input type="checkbox" id="toggleHand" checked><span>✋ Hand + fingers</span></label>
@@ -557,7 +557,7 @@ body {
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="card-scan">
     <div class="card-title">🛰 3D scan</div>
     <div class="hint">Live 3D reconstruction of your head from the on-device mesh. Drag to orbit · scroll to zoom. Freeze a frame, then save it as a real .OBJ 3D file — everything stays on this Mac.</div>
     <canvas id="scanCanvas" width="320" height="320"></canvas>
