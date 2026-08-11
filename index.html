@@ -3931,6 +3931,13 @@ function loop() {
 
       if (toggleObject.checked) drawObjectDetections();
 
+      // OCR: process a frame every interval (async, so it never blocks the loop).
+      if (toggleOCR.checked && now - ocrLastRunAt > OCR_INTERVAL_MS) {
+        ocrLastRunAt = now;
+        runOcrOnce();
+      }
+      drawOcrResult();
+
       updateWellbeing(now);
 
       spellingPanel.style.display = toggleASL.checked ? "flex" : "none";
