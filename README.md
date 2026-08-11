@@ -106,3 +106,11 @@ if you want that built out.
 - `server.js` — the local Node server: serves the page and handles real
   brightness requests
 - `package.json` — the one dependency (`brightness`)
+
+## Git auto-sync
+
+`sync_remote.sh` runs in the background (started automatically by
+`start.command`). Whenever files change here, it waits ~12 seconds for the
+edit to settle, commits with an `auto-sync` message, and pushes to the
+private GitHub repo. Nothing to do on your side. `node_modules/` and logs
+are git-ignored — after cloning, run `npm install` once.
