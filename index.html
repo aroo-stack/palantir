@@ -4058,7 +4058,7 @@ function runModel(key, fn, now) {
 // skeleton reads steady instead of hopping frame to frame. Faces already blend
 // via the 3D-scan lerp; hands get a straight exponential moving average. Only
 // applied to the draw path, never to the raw results used by gesture logic.
-let handSmoothLm = null;
+let handSmoothBuffers = [];
 const LM_EMA = 0.35;
 function smoothLandmarks(raw, smooth) {
   if (!raw) return null;
