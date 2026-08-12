@@ -1,0 +1,14 @@
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/deps/thiserror-7746729973965d59.d: /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs /Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/build/thiserror-bf96807e4160a302/out/private.rs
+
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/deps/libthiserror-7746729973965d59.rlib: /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs /Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/build/thiserror-bf96807e4160a302/out/private.rs
+
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/deps/libthiserror-7746729973965d59.rmeta: /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs /Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/build/thiserror-bf96807e4160a302/out/private.rs
+
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs:
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/build/thiserror-bf96807e4160a302/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/release/build/thiserror-bf96807e4160a302/out
