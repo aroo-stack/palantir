@@ -3278,7 +3278,7 @@ startBtn.addEventListener("click", async () => {
   btnStageStart.disabled = true;
   setStatus("Requesting camera...", "busy");
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
     video.srcObject = stream;
     await video.play();
     video.style.opacity = "1";
@@ -4088,24 +4088,25 @@ function loop() {
       lastVideoTime = video.currentTime;
 
       let handResult = lastHandResult, faceResult = lastFaceResult, poseResult = lastPoseResult;
-      // One heavy model per frame; pick whichever enabled model is MOST overdue
-      // (longest since it last ran). A fixed priority chain starves face/pose
-      // when hands are cheap — runing only ever hand makes tracking look far
-      // worse even though the loop isn't stalled.
-      let bestKey = null, bestWait = -Infinity;
-      const want = [["hand", toggleHand.checked], ["face", toggleFace.checked], ["pose", toggleBody.checked]];
-      for (const [key, enabled] of want) {
-        if (enabled && modelDue(key, now)) {
-          const wait = now - modelLastAt[key];
-          if (wait > bestWait) { bestWait = wait; bestKey = key; }
-        }
-      }
-      if (bestKey === "hand") {
+      // Hands are gesture-critical: if a hand frame is due, it gets the slot.
+      // Otherwise fill the slot with whichever other enabled model is most
+      // overdue, so faces/body still update whenever hands aren't demanding it.
+      if (toggleHand.checked && modelDue("hand", now)) {
         handResult = runModel("hand", () => handLandmarker.detectForVideo(video, now), now);
-      } else if (bestKey === "face") {
-        faceResult = runModel("face", () => faceLandmarker.detectForVideo(video, now), now);
-      } else if (bestKey === "pose") {
-        poseResult = runModel("pose", () => poseLandmarker.detectForVideo(video, now), now);
+      } else {
+        let bestKey = null, bestWait = -Infinity;
+        const want = [["face", toggleFace.checked], ["pose", toggleBody.checked]];
+        for (const [key, enabled] of want) {
+          if (enabled && modelDue(key, now)) {
+            const wait = now - modelLastAt[key];
+            if (wait > bestWait) { bestWait = wait; bestKey = key; }
+          }
+        }
+        if (bestKey === "face") {
+          faceResult = runModel("face", () => faceLandmarker.detectForVideo(video, now), now);
+        } else if (bestKey === "pose") {
+          poseResult = runModel("pose", () => poseLandmarker.detectForVideo(video, now), now);
+        }
       }
       lastHandResult = handResult;
       lastFaceResult = faceResult;
