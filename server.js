@@ -108,6 +108,20 @@ function openApp(appName) {
   });
 }
 
+// Bring the next/previous app window to the front, mirroring ⌘⇥ / ⌘⇧⇥ but
+// ordered by on-screen window z-order — predictable for a swipe gesture.
+// Delegates to the compiled window_switch helper (CoreGraphics + AppKit), so
+// no System Events / Automation permission is needed.
+function switchWindow(direction) {
+  const helper = path.join(ROOT, "window_switch");
+  return new Promise((resolve, reject) => {
+    execFile(helper, [String(direction)], { timeout: 5000 }, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+}
+
 function lanIPs() {
   const out = [];
   for (const list of Object.values(os.networkInterfaces())) {
@@ -641,6 +655,18 @@ const server = http.createServer(async (req, res) => {
       const result = await runMediaControl(action, app, uri);
       if (result.error) return sendJson(res, 200, { ok: false, error: result.error });
       return sendJson(res, 200, { ok: true, ...result });
+    } catch (e) {
+      return sendJson(res, 500, { error: e.message });
+    }
+  }
+
+  if (url.pathname === "/api/window" && req.method === "POST") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const direction = String(body.direction || "").toLowerCase();
+      if (direction !== "next" && direction !== "prev") return sendJson(res, 400, { error: "direction must be 'next' or 'prev'" });
+      await switchWindow(direction);
+      return sendJson(res, 200, { success: true });
     } catch (e) {
       return sendJson(res, 500, { error: e.message });
     }

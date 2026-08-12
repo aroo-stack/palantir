@@ -169,6 +169,33 @@ body {
 }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #3dd3a2; animation: livePulse 1.6s infinite; }
 @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+/* Swipe feedback: big translucent arrow sweeps across the camera when a
+   swipe gesture fires, echoing the window-switch direction. */
+.swipe-arrow {
+  position: absolute; inset: 0; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0;
+}
+.swipe-arrow.show { animation: swipeArrowAnim 0.7s ease-out forwards; }
+.swipe-arrow.show.right { transform: scaleX(1); }
+.swipe-arrow.show.left { transform: scaleX(-1); }
+@keyframes swipeArrowAnim {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  70%  { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+.swipe-arrow::before {
+  content: "➜";
+  font-size: min(18vw, 110px);
+  color: #bfe4ff;
+  text-shadow: 0 0 24px rgba(90, 162, 255, 0.9), 0 0 60px rgba(90, 162, 255, 0.5);
+  animation: swipeArrowSlide 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes swipeArrowSlide {
+  from { transform: translateX(-30vw); }
+  to   { transform: translateX(30vw); }
+}
 .hud-readout {
   position: absolute; top: 12px; left: 12px; z-index: 5;
   font: 11px "SF Mono", Menlo, Consolas, monospace; line-height: 1.7;
@@ -576,6 +603,7 @@ body {
   <video id="video" autoplay playsinline muted aria-hidden="true"></video>
   <canvas id="overlay"></canvas>
   <div class="live-badge" id="liveBadge"><span class="live-dot"></span>LIVE · <span id="liveFps">—</span> fps</div>
+  <div class="swipe-arrow" id="swipeArrow" aria-hidden="true"></div>
   <i class="vf tl" aria-hidden="true"></i><i class="vf tr" aria-hidden="true"></i><i class="vf bl" aria-hidden="true"></i><i class="vf br" aria-hidden="true"></i>
   <div class="stage-placeholder" id="stagePlaceholder">
     <div class="glyph">◈</div>
@@ -648,6 +676,10 @@ body {
       <label class="tl"><input type="checkbox" id="toggleBrightnessPinch"><span>🔅 Pinch dims real screen brightness</span></label>
       <span class="hint">— local server running, real OS control unlocked</span>
     </div>
+    <div class="pills" style="margin-top:9px;">
+      <label class="tl"><input type="checkbox" id="toggleSwipeWindow"><span>👈👉 Swipe switches window</span></label>
+      <span class="hint">— swipe your hand across the camera; right = next window, left = previous</span>
+    </div>
   </div>
 
   <div class="card" id="card-voice">
@@ -715,6 +747,7 @@ body {
         <span>👊👊 Both fists → skeleton-only mode</span>
         <span>🤟 Web-slinger sign → mask on face</span>
         <span>🤏 Pinch → open the URL you typed</span>
+        <span>👈👉 Swipe hand across the camera → next/previous window</span>
         <span>🖐️ Hold an ASL letter → spell words</span>
         <span>👁 Tick “Gaze tracking” → see where you're looking</span>
         <span>📦 Tick “Detect objects” → hold up a phone, book, bottle → labelled box</span>
@@ -868,6 +901,7 @@ const pinchUrlInput = document.getElementById("pinchUrl");
 const pinchOpenModeSelect = document.getElementById("pinchOpenMode");
 const electronToggles = document.getElementById("electronToggles");
 const toggleBrightnessPinch = document.getElementById("toggleBrightnessPinch");
+const toggleSwipeWindow = document.getElementById("toggleSwipeWindow");
 const voicePicker = document.getElementById("voicePicker");
 const voiceToggles = document.getElementById("voiceToggles");
 const toggleVoice = document.getElementById("toggleVoice");
@@ -911,7 +945,7 @@ const btnStageStart = document.getElementById("btnStageStart");
 // the first draw is safe.
 const PERSIST_TOGGLES = [
   "toggleHand", "toggleFace", "toggleBody", "toggleLabels", "toggleAngles",
-  "toggleASL", "toggleGaze", "toggleOCR", "toggleObject", "togglePinchOpen", "toggleBrightnessPinch", "toggleVoice", "toggleWellbeing"
+  "toggleASL", "toggleGaze", "toggleOCR", "toggleObject", "togglePinchOpen", "toggleBrightnessPinch", "toggleVoice", "toggleWellbeing", "toggleSwipeWindow"
 ];
 PERSIST_TOGGLES.forEach(id => {
   const el = document.getElementById(id);
@@ -1090,6 +1124,62 @@ function checkBrightnessPinch(lm, now) {
     toggleRealBrightness();
   }
   brightnessPinchWasActive = isPinching;
+}
+
+// ---------- Swipe hand across the camera → switch app window via the local server ----------
+// Track the wrist across time; a fast horizontal sweep of a decent fraction of the
+// frame counts as a swipe. Rightward = "next" window, leftward = "prev" window.
+let swipeStart = null;   // { x, y, t } position when a possible swipe began
+let swipeFiredAt = 0;
+const SWIPE_TRACK_LIMIT_MS = 400; // a swipe must complete within this window
+const SWIPE_DIST_FRAC = 0.28;     // must travel ≥28% of frame width
+const SWIPE_SPEED_FRAC = 0.55;    // fraction of frame width per second — real sweep, not drift
+const SWIPE_COOLDOWN_MS = 900;
+
+function checkSwipeSwitchWindow(lm, now) {
+  if (!localServerAvailable || !toggleSwipeWindow.checked) {
+    swipeStart = null;
+    return;
+  }
+  const x = lm[0].x; // wrist
+  const y = lm[0].y;
+
+  if (!swipeStart) {
+    swipeStart = { x, y, t: now };
+    return;
+  }
+
+  const dx = x - swipeStart.x;
+  const dy = y - swipeStart.y;
+  const dtMs = now - swipeStart.t;
+
+  // Too vertical, too slow, or the gesture window lapsed → restart tracking.
+  if (dtMs > SWIPE_TRACK_LIMIT_MS || Math.abs(dy) / (Math.abs(dx) + 0.01) > 1.2) {
+    swipeStart = { x, y, t: now };
+    return;
+  }
+
+  const speed = Math.abs(dx) / Math.max(dtMs / 1000, 0.001);
+  if (speed < SWIPE_SPEED_FRAC) return; // slow drift — keep tracking, don't fire
+
+  if (Math.abs(dx) >= SWIPE_DIST_FRAC) {
+    const dir = dx > 0 ? "next" : "prev"; // right = next window
+    if (now - swipeFiredAt < SWIPE_COOLDOWN_MS) {
+      swipeStart = null;
+      return;
+    }
+    swipeFiredAt = now;
+    swipeStart = null;
+    setStatus(`Swipe ${dir === "next" ? "right" : "left"} → switching window`, "ok");
+    const arrow = document.getElementById("swipeArrow");
+    arrow.className = "swipe-arrow show " + (dir === "next" ? "right" : "left");
+    setTimeout(() => { arrow.className = "swipe-arrow"; }, 700);
+    fetch("/api/window", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ direction: dir })
+    }).catch(() => {});
+  }
 }
 
 // ---------- Voice control → hand-height volume / brightness ----------
@@ -4059,6 +4149,7 @@ function loop() {
           if (i === 0) checkBrightnessPinch(lm, now);
           if (i === 0) checkVolumeGesture(lm, now);
           if (i === 0) checkBrightnessVoiceGesture(lm, now);
+          if (i === 0) checkSwipeSwitchWindow(lm, now);
         });
       } else {
         handSmoothLm = null;
