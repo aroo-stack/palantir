@@ -32,10 +32,7 @@
     "icon": [],
     "macOS": {
       "minimumSystemVersion": "10.15",
-      "infoPlist": {
-        "NSCameraUsageDescription": "The camera feed stays on this Mac — used for on-device hand, face and pose tracking.",
-        "NSMicrophoneUsageDescription": "The microphone is used for local voice commands and reminders. Audio never leaves this Mac."
-      }
+      "infoPlist": "./Info.plist"
     }
   }
 }

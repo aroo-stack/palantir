@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>The camera feed stays on this Mac — used for on-device hand, face and pose tracking.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>The microphone is used for local voice commands and reminders. Audio never leaves this Mac.</string>
+</dict>
+</plist>
