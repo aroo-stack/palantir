@@ -4086,14 +4086,23 @@ function loop() {
       lastVideoTime = video.currentTime;
 
       let handResult = lastHandResult, faceResult = lastFaceResult, poseResult = lastPoseResult;
-      // At most ONE heavy model per frame — hand (gesture-critical) gets the
-      // slot first, then face, then pose. Each only runs again once its own
-      // measured cost + min cadence has elapsed, so the loop never freezes.
-      if (toggleHand.checked && modelDue("hand", now)) {
+      // One heavy model per frame; pick whichever enabled model is MOST overdue
+      // (longest since it last ran). A fixed priority chain starves face/pose
+      // when hands are cheap — runing only ever hand makes tracking look far
+      // worse even though the loop isn't stalled.
+      let bestKey = null, bestWait = -Infinity;
+      const want = [["hand", toggleHand.checked], ["face", toggleFace.checked], ["pose", toggleBody.checked]];
+      for (const [key, enabled] of want) {
+        if (enabled && modelDue(key, now)) {
+          const wait = now - modelLastAt[key];
+          if (wait > bestWait) { bestWait = wait; bestKey = key; }
+        }
+      }
+      if (bestKey === "hand") {
         handResult = runModel("hand", () => handLandmarker.detectForVideo(video, now), now);
-      } else if (toggleFace.checked && modelDue("face", now)) {
+      } else if (bestKey === "face") {
         faceResult = runModel("face", () => faceLandmarker.detectForVideo(video, now), now);
-      } else if (toggleBody.checked && modelDue("pose", now)) {
+      } else if (bestKey === "pose") {
         poseResult = runModel("pose", () => poseLandmarker.detectForVideo(video, now), now);
       }
       lastHandResult = handResult;
