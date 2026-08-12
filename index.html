@@ -4036,13 +4036,15 @@ let lastHandResult = null, lastFaceResult = null, lastPoseResult = null;
 // Now each model's real cost is measured and smoothed; a model only re-runs
 // when enough wall-clock has passed for the loop to breathe, and only ONE
 // heavy model runs per frame so a single frame is never double-blocked.
-const MODEL_MIN_MS = { hand: 70, face: 130, pose: 150 };
-let modelSmoothedMs = { hand: 70, face: 130, pose: 150 };
+const MODEL_MIN_MS = { hand: 20, face: 40, pose: 40 };
+let modelSmoothedMs = { hand: 30, face: 60, pose: 60 };
 let modelLastAt = { hand: 0, face: 0, pose: 0 };
 
 function modelDue(key, now) {
   const min = MODEL_MIN_MS[key];
-  const adaptive = Math.max(min, modelSmoothedMs[key] * 1.3);
+  // Let each model run as fast as it actually can — just add a small 1.1x
+  // headroom so the loop isn't pegged at 100% on the first heavy frames.
+  const adaptive = Math.max(min, modelSmoothedMs[key] * 1.1);
   return now - modelLastAt[key] >= adaptive;
 }
 function runModel(key, fn, now) {
@@ -4059,7 +4061,7 @@ function runModel(key, fn, now) {
 // via the 3D-scan lerp; hands get a straight exponential moving average. Only
 // applied to the draw path, never to the raw results used by gesture logic.
 let handSmoothBuffers = [];
-const LM_EMA = 0.35;
+const LM_EMA = 0.6;
 function smoothLandmarks(raw, smooth) {
   if (!raw) return null;
   if (!smooth || smooth.length !== raw.length) return raw.map(p => ({ x: p.x, y: p.y, z: p.z }));
