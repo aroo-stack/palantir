@@ -3528,7 +3528,16 @@ function rotScan(p, yaw, pitch) {
 }
 
 function renderScan(t) {
-  requestAnimationFrame(renderScan);
+requestAnimationFrame(renderScan);
+
+// Pause the scan renderer when its card scrolls out of view — it redraws a full
+// 3D mesh 25×/sec, so leaving it running invisibly taxes the tracking loop.
+if ("IntersectionObserver" in window) {
+  const scanObs = new IntersectionObserver(entries => {
+    renderScanVisible = !!entries[0].isIntersecting;
+  });
+  scanObs.observe(scanCanvas);
+}
   if (!renderScanVisible) return; // card off-screen → skip the expensive mesh render
   if (t - lastScanT < 40) return; // ~25fps is plenty for a scan viewer
   lastScanT = t;
