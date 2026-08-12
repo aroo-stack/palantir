@@ -4025,8 +4025,31 @@ function drawPinchMeter(lm) {
 
 // ---------- Main loop ----------
 let lastHandResult = null, lastFaceResult = null, lastPoseResult = null;
-let detectionFrameCounter = 0;
-const DETECTION_INTERVAL = 2; // run the actual models every 2nd new video frame — halves the compute load; drawing still updates every frame using the last known result
+
+// Adaptive detection budget. Each model call is synchronous — in a WebKit
+// webview the WASM can take 100-300ms, and the old fixed "every Nth frame"
+// scheduling let those calls pile up: the loop would freeze, buffer, then
+// burst, which reads as "I move my hand and it catches up a second later".
+// Now each model's real cost is measured and smoothed; a model only re-runs
+// when enough wall-clock has passed for the loop to breathe, and only ONE
+// heavy model runs per frame so a single frame is never double-blocked.
+const MODEL_MIN_MS = { hand: 70, face: 130, pose: 150 };
+let modelSmoothedMs = { hand: 70, face: 130, pose: 150 };
+let modelLastAt = { hand: 0, face: 0, pose: 0 };
+
+function modelDue(key, now) {
+  const min = MODEL_MIN_MS[key];
+  const adaptive = Math.max(min, modelSmoothedMs[key] * 1.3);
+  return now - modelLastAt[key] >= adaptive;
+}
+function runModel(key, fn, now) {
+  const t0 = performance.now();
+  const out = fn();
+  const took = performance.now() - t0;
+  modelSmoothedMs[key] = modelSmoothedMs[key] * 0.6 + took * 0.4;
+  modelLastAt[key] = now;
+  return out;
+}
 
 // Lightweight temporal smoothing for hands (and fixed-order landmarks) so the
 // skeleton reads steady instead of hopping frame to frame. Faces already blend
