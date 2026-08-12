@@ -535,6 +535,7 @@ const MIME = {
 };
 
 const server = http.createServer(async (req, res) => {
+  console.log(`[req] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
   // ---------- API ----------
