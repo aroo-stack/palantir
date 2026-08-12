@@ -4081,37 +4081,27 @@ function loop() {
   try {
     if (video.currentTime !== lastVideoTime) {
       lastVideoTime = video.currentTime;
-      detectionFrameCounter++;
 
       let handResult = lastHandResult, faceResult = lastFaceResult, poseResult = lastPoseResult;
-      if (detectionFrameCounter % DETECTION_INTERVAL === 0) {
-        // Stagger the heavy models across separate detection frames instead of
-        // running all three at once. In a webview one full pass (face + hand +
-        // pose) can stall the render loop for hundreds of ms, which shows up as
-        // "I move my hand and it catches up seconds later". Now each pass runs
-        // exactly one heavy model, so the loop stays fluid and results stream
-        // in steadily. Hands are gesture-critical (swipe, pinch) so they stay
-        // freshest; face and pose trade off every other pass.
-        const pass = Math.floor(detectionFrameCounter / DETECTION_INTERVAL);
-        if (toggleHand.checked) {
-          handResult = handLandmarker.detectForVideo(video, now);
-        }
-        if (toggleFace.checked && pass % 2 === 1) {
-          faceResult = faceLandmarker.detectForVideo(video, now);
-        }
-        if (toggleBody.checked && pass % 2 === 0) {
-          poseResult = poseLandmarker.detectForVideo(video, now);
-        }
-        lastHandResult = handResult;
-        lastFaceResult = faceResult;
-        lastPoseResult = poseResult;
-        if (toggleObject.checked && now - lastObjectDetectAt > 400) {
-          if (objectDetector) {
-            objectDetectResult = objectDetector.detectForVideo(video, now).detections;
-            lastObjectDetectAt = now;
-          } else {
-            ensureObjectDetector();
-          }
+      // At most ONE heavy model per frame — hand (gesture-critical) gets the
+      // slot first, then face, then pose. Each only runs again once its own
+      // measured cost + min cadence has elapsed, so the loop never freezes.
+      if (toggleHand.checked && modelDue("hand", now)) {
+        handResult = runModel("hand", () => handLandmarker.detectForVideo(video, now), now);
+      } else if (toggleFace.checked && modelDue("face", now)) {
+        faceResult = runModel("face", () => faceLandmarker.detectForVideo(video, now), now);
+      } else if (toggleBody.checked && modelDue("pose", now)) {
+        poseResult = runModel("pose", () => poseLandmarker.detectForVideo(video, now), now);
+      }
+      lastHandResult = handResult;
+      lastFaceResult = faceResult;
+      lastPoseResult = poseResult;
+      if (toggleObject.checked && now - lastObjectDetectAt > 500) {
+        if (objectDetector) {
+          objectDetectResult = objectDetector.detectForVideo(video, now).detections;
+          lastObjectDetectAt = now;
+        } else {
+          ensureObjectDetector();
         }
       }
 
