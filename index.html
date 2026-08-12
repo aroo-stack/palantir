@@ -4186,13 +4186,34 @@ function loop() {
       let aslLetter = "—";
       let webSlingerActive = false;
       if (handResult && handResult.landmarks) {
+        // Keep a smoothing buffer per detected hand. One shared buffer drags
+        // both hands toward each other (and toward a stale middle position when
+        // a hand is briefly missed), which is the "broken two-hand" bug.
+        const prev = handSmoothBuffers;
+        handSmoothBuffers = [];
+        const centroid = (lm) => {
+          let x = 0, y = 0;
+          for (const p of lm) { x += p.x; y += p.y; }
+          return [x / lm.length, y / lm.length, lm.length];
+        };
         handResult.landmarks.forEach((lm, i) => {
           handCount++;
-          // Smoothed copy for drawing only; gesture logic still uses raw lm.
-          handSmoothLm = smoothLandmarks(lm, handSmoothLm);
-          drawHand(handSmoothLm || lm);
+          // Match this hand to the nearest previous buffer by centroid (order
+          // can swap between frames), reset if it's a new/far hand.
+          const [cx, cy, n] = centroid(lm);
+          let best = -1, bestD = Infinity;
+          for (let j = 0; j < prev.length; j++) {
+            if (!prev[j]) continue;
+            const [px, py] = centroid(prev[j]);
+            const d = (cx - px) ** 2 + (cy - py) ** 2;
+            if (d < bestD) { bestD = d; best = j; }
+          }
+          handSmoothBuffers[i] = (best >= 0 && bestD < 0.01)
+            ? smoothLandmarks(lm, prev[best])
+            : lm;
+          drawHand(handSmoothBuffers[i]);
           if (toggleASL.checked && i === 0) {
-            aslLetter = classifyASLLetter(handSmoothLm || lm);
+            aslLetter = classifyASLLetter(handSmoothBuffers[i]);
           }
           if (isWebSlingerSign(lm)) webSlingerActive = true;
           if (i === 0) checkPinchOpen(lm, now);
@@ -4202,7 +4223,7 @@ function loop() {
           if (i === 0) checkSwipeSwitchWindow(lm, now);
         });
       } else {
-        handSmoothLm = null;
+        handSmoothBuffers = [];
       }
       if (webSlingerActive && currentFaceLmForMask) drawWebMask(currentFaceLmForMask);
 
