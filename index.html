@@ -3488,6 +3488,7 @@ const scanOrbit = { yaw: 0, pitch: 0, spin: 0.005 };
 let scanZoom = 1;
 let scanDragging = false;
 let lastScanT = 0;
+let renderScanVisible = true; // scan render pauses when its card is off-screen (frees CPU for tracking)
 
 // Converts one face landmark set into head-centered 3D points (eye distance = 1),
 // keeping the raw normalized coords as the texture UVs (u=x, v=1-y).
@@ -3528,6 +3529,7 @@ function rotScan(p, yaw, pitch) {
 
 function renderScan(t) {
   requestAnimationFrame(renderScan);
+  if (!renderScanVisible) return; // card off-screen → skip the expensive mesh render
   if (t - lastScanT < 40) return; // ~25fps is plenty for a scan viewer
   lastScanT = t;
   const W = SCAN_SIZE, H = SCAN_SIZE;
