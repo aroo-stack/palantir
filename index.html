@@ -3275,7 +3275,7 @@ startBtn.addEventListener("click", async () => {
   btnStageStart.disabled = true;
   setStatus("Requesting camera...", "busy");
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
     video.srcObject = stream;
     await video.play();
     video.style.opacity = "1";
