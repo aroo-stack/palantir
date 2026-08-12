@@ -1,0 +1,14 @@
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/deps/thiserror-7b5d03be91c556fa.d: /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs /Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/build/thiserror-2de49a2587e8741d/out/private.rs
+
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/deps/libthiserror-7b5d03be91c556fa.rlib: /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs /Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/build/thiserror-2de49a2587e8741d/out/private.rs
+
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/deps/libthiserror-7b5d03be91c556fa.rmeta: /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs /Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs /Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/build/thiserror-2de49a2587e8741d/out/private.rs
+
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/lib.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/aserror.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/display.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/var.rs:
+/Users/aroo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.20/src/private.rs:
+/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/build/thiserror-2de49a2587e8741d/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/aroo/Downloads/gesture-tracker-app/src-tauri/target/debug/build/thiserror-2de49a2587e8741d/out
