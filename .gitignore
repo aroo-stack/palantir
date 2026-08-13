@@ -7,3 +7,7 @@ node_modules/
 # logs
 server.log
 sync.log
+
+# build output
+release/
+dist/

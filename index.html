@@ -677,8 +677,8 @@ body {
       <span class="hint">— local server running, real OS control unlocked</span>
     </div>
     <div class="pills" style="margin-top:9px;">
-      <label class="tl"><input type="checkbox" id="toggleSwipeWindow"><span>👈👉 Swipe switches window</span></label>
-      <span class="hint">— swipe your hand across the camera; right = next window, left = previous</span>
+      <label class="tl"><input type="checkbox" id="toggleSwipeWindow" checked><span>🤏 Pinch switches window</span></label>
+      <span class="hint">— pinch left hand = previous window, right hand = next window</span>
     </div>
   </div>
 
@@ -747,7 +747,7 @@ body {
         <span>👊👊 Both fists → skeleton-only mode</span>
         <span>🤟 Web-slinger sign → mask on face</span>
         <span>🤏 Pinch → open the URL you typed</span>
-        <span>👈👉 Swipe hand across the camera → next/previous window</span>
+        <span>🤏 Pinch left hand → previous window, right hand → next window</span>
         <span>🖐️ Hold an ASL letter → spell words</span>
         <span>👁 Tick “Gaze tracking” → see where you're looking</span>
         <span>📦 Tick “Detect objects” → hold up a phone, book, bottle → labelled box</span>
@@ -982,6 +982,7 @@ let lastPinchOpenTime = 0;
 const PINCH_OPEN_COOLDOWN_MS = 1500;
 
 function checkPinchOpen(lm, now) {
+  if (toggleSwipeWindow.checked) return; // pinch is reserved for window-switching
   const handScale = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y, (lm[9].z || 0) - (lm[0].z || 0));
   const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y, (lm[4].z || 0) - (lm[8].z || 0));
   const isPinching = handScale > 0 && pinchDist / handScale < 0.4; // loosened so it triggers more easily
@@ -1060,12 +1061,16 @@ async function loadVoiceList() {
       o.value = name; o.textContent = label; o.selected = !!selected;
       voiceSelect.appendChild(o);
     };
-    option("", defaultEntry.label, !prefill);
+    const voiceNames = new Set(data.voices.map(v => v.name));
+    // If the saved voice is no longer installed, fall back to the default
+    // (both the DOM selection and currentVoice must agree).
+    const effectivePrefill = (prefill && voiceNames.has(prefill)) ? prefill : defaultVoice;
+    option("", defaultEntry.label, !effectivePrefill);
     for (const v of data.voices) {
       const label = `${v.name} — ${v.sample}`;
-      option(v.name, label, v.name === prefill);
+      option(v.name, label, v.name === effectivePrefill);
     }
-    currentVoice = prefill;
+    currentVoice = effectivePrefill;
     voiceSelect.addEventListener("change", () => {
       currentVoice = voiceSelect.value;
       localStorage.setItem("jarvis-voice-v2", currentVoice);
@@ -1126,51 +1131,40 @@ function checkBrightnessPinch(lm, now) {
   brightnessPinchWasActive = isPinching;
 }
 
-// ---------- Swipe hand across the camera → switch app window via the local server ----------
-// Track the wrist across time; a fast horizontal sweep of a decent fraction of the
-// frame counts as a swipe. Rightward = "next" window, leftward = "prev" window.
-let swipeStart = null;   // { x, y, t } position when a possible swipe began
-let swipeFiredAt = 0;
-const SWIPE_TRACK_LIMIT_MS = 400; // a swipe must complete within this window
-const SWIPE_DIST_FRAC = 0.28;     // must travel ≥28% of frame width
-const SWIPE_SPEED_FRAC = 0.55;    // fraction of frame width per second — real sweep, not drift
-const SWIPE_COOLDOWN_MS = 900;
+// ---------- Pinch hand → switch app window via the local server ----------
+let pinchSwitchWasActive = false;
+let lastPinchSwitchTime = 0;
+const PINCH_SWITCH_COOLDOWN_MS = 1300;
 
-function checkSwipeSwitchWindow(lm, now) {
+// Hand-based window switching: pinch with the RIGHT hand (as seen in the
+// mirrored video) = next window, pinch with the LEFT hand = previous window.
+// Reliable under laggy tracking — a pinch just needs one clean frame, unlike
+// the old swipe which needed 18%+ travel to accumulate across slow updates.
+function checkPinchSwitchWindow(handResult, i, now) {
   if (!localServerAvailable || !toggleSwipeWindow.checked) {
-    swipeStart = null;
+    pinchSwitchWasActive = false;
     return;
   }
-  const x = lm[0].x; // wrist
-  const y = lm[0].y;
+  const lm = handResult.landmarks[i];
+  if (!lm) return;
+  const handed = (handResult.handedness && handResult.handedness[i]) || [];
+  const name = (handed[0] && handed[0].categoryName) || "";
 
-  if (!swipeStart) {
-    swipeStart = { x, y, t: now };
-    return;
-  }
+  const handScale = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y, (lm[9].z || 0) - (lm[0].z || 0));
+  const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y, (lm[4].z || 0) - (lm[8].z || 0));
+  const isPinching = handScale > 0 && pinchDist / handScale < 0.4;
 
-  const dx = x - swipeStart.x;
-  const dy = y - swipeStart.y;
-  const dtMs = now - swipeStart.t;
-
-  // Too vertical, too slow, or the gesture window lapsed → restart tracking.
-  if (dtMs > SWIPE_TRACK_LIMIT_MS || Math.abs(dy) / (Math.abs(dx) + 0.01) > 1.2) {
-    swipeStart = { x, y, t: now };
-    return;
-  }
-
-  const speed = Math.abs(dx) / Math.max(dtMs / 1000, 0.001);
-  if (speed < SWIPE_SPEED_FRAC) return; // slow drift — keep tracking, don't fire
-
-  if (Math.abs(dx) >= SWIPE_DIST_FRAC) {
-    const dir = dx > 0 ? "next" : "prev"; // right = next window
-    if (now - swipeFiredAt < SWIPE_COOLDOWN_MS) {
-      swipeStart = null;
-      return;
-    }
-    swipeFiredAt = now;
-    swipeStart = null;
-    setStatus(`Swipe ${dir === "next" ? "right" : "left"} → switching window`, "ok");
+  if (isPinching && !pinchSwitchWasActive && now - lastPinchSwitchTime > PINCH_SWITCH_COOLDOWN_MS) {
+    lastPinchSwitchTime = now;
+    // Handedness as reported by MediaPipe is mirror-flipped vs what you see in
+    // the mirrored preview: your RIGHT hand comes back as "Left", your LEFT as
+    // "Right". Map so physical-left hand → previous window, physical-right →
+    // next window.
+    const dir = name.toUpperCase() === "RIGHT" ? "prev" : "next";
+    // MediaPipe returns the mirror-flipped label; the physical hand is its
+    // opposite — reflect that in the status text so it matches what the user did.
+    const physHand = name.toUpperCase() === "LEFT" ? "right" : "left";
+    setStatus(`Pinch ${physHand} hand → ${dir === "next" ? "next" : "previous"} window`, "ok");
     const arrow = document.getElementById("swipeArrow");
     arrow.className = "swipe-arrow show " + (dir === "next" ? "right" : "left");
     setTimeout(() => { arrow.className = "swipe-arrow"; }, 700);
@@ -1180,6 +1174,7 @@ function checkSwipeSwitchWindow(lm, now) {
       body: JSON.stringify({ direction: dir })
     }).catch(() => {});
   }
+  pinchSwitchWasActive = isPinching;
 }
 
 // ---------- Voice control → hand-height volume / brightness ----------
@@ -1311,6 +1306,10 @@ async function applyVoiceDirective(d) {
     voiceStatus.textContent = `Setting brightness to ${newLevel}%`;
     try {
       await setRealBrightness(newLevel / 100);
+      // An explicit voice-set level supersedes any pinch-dim state so the
+      // restore path (beforeunload / toggle) doesn't snap back to a stale value.
+      originalBrightness = newLevel / 100;
+      isDimmed = false;
       speak(`Brightness set to ${newLevel} percent`);
     } catch (e) {
       console.warn("Brightness control failed:", e);
@@ -3278,7 +3277,7 @@ startBtn.addEventListener("click", async () => {
   btnStageStart.disabled = true;
   setStatus("Requesting camera...", "busy");
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
     video.srcObject = stream;
     await video.play();
     video.style.opacity = "1";
@@ -3288,7 +3287,7 @@ startBtn.addEventListener("click", async () => {
     setStatus("Tracking live", "ok");
     stagePlaceholder.classList.add("hide");
     liveBadge.style.display = "flex";
-    requestAnimationFrame(loop);
+requestAnimationFrame(loop);
   } catch (e) {
     setStatus("Camera access denied or unavailable: " + e.message, "error");
     startBtn.disabled = false;
@@ -3493,6 +3492,18 @@ let scanDragging = false;
 let lastScanT = 0;
 let renderScanVisible = true; // scan render pauses when its card is off-screen (frees CPU for tracking)
 
+// Pause the scan renderer when its card scrolls out of view — it redraws a full
+// 3D mesh 25×/sec, so leaving it running invisibly taxes the tracking loop.
+// Set up once, not inside renderScan's rAF loop (which would leak an observer
+// every frame).
+(() => {
+  if (!("IntersectionObserver" in window)) return;
+  const scanObs = new IntersectionObserver(entries => {
+    renderScanVisible = !!entries[0].isIntersecting;
+  });
+  scanObs.observe(scanCanvas);
+})();
+
 // Converts one face landmark set into head-centered 3D points (eye distance = 1),
 // keeping the raw normalized coords as the texture UVs (u=x, v=1-y).
 function buildFaceMesh3D(lm) {
@@ -3533,14 +3544,6 @@ function rotScan(p, yaw, pitch) {
 function renderScan(t) {
 requestAnimationFrame(renderScan);
 
-// Pause the scan renderer when its card scrolls out of view — it redraws a full
-// 3D mesh 25×/sec, so leaving it running invisibly taxes the tracking loop.
-if ("IntersectionObserver" in window) {
-  const scanObs = new IntersectionObserver(entries => {
-    renderScanVisible = !!entries[0].isIntersecting;
-  });
-  scanObs.observe(scanCanvas);
-}
   if (!renderScanVisible) return; // card off-screen → skip the expensive mesh render
   if (t - lastScanT < 40) return; // ~25fps is plenty for a scan viewer
   lastScanT = t;
@@ -4036,32 +4039,10 @@ let lastHandResult = null, lastFaceResult = null, lastPoseResult = null;
 // Now each model's real cost is measured and smoothed; a model only re-runs
 // when enough wall-clock has passed for the loop to breathe, and only ONE
 // heavy model runs per frame so a single frame is never double-blocked.
-const MODEL_MIN_MS = { hand: 20, face: 40, pose: 40 };
-let modelSmoothedMs = { hand: 30, face: 60, pose: 60 };
-let modelLastAt = { hand: 0, face: 0, pose: 0 };
-
-function modelDue(key, now) {
-  const min = MODEL_MIN_MS[key];
-  // Let each model run as fast as it actually can — just add a small 1.1x
-  // headroom so the loop isn't pegged at 100% on the first heavy frames.
-  const adaptive = Math.max(min, modelSmoothedMs[key] * 1.1);
-  return now - modelLastAt[key] >= adaptive;
-}
-function runModel(key, fn, now) {
-  const t0 = performance.now();
-  const out = fn();
-  const took = performance.now() - t0;
-  modelSmoothedMs[key] = modelSmoothedMs[key] * 0.6 + took * 0.4;
-  modelLastAt[key] = now;
-  return out;
-}
-
-// Lightweight temporal smoothing for hands (and fixed-order landmarks) so the
-// skeleton reads steady instead of hopping frame to frame. Faces already blend
-// via the 3D-scan lerp; hands get a straight exponential moving average. Only
-// applied to the draw path, never to the raw results used by gesture logic.
+const DETECTION_INTERVAL = 2; // run the actual models every 2nd new video frame — halves the compute load; drawing still updates every frame using the last known result
+let detectionFrameCounter = 0;
 let handSmoothBuffers = [];
-const LM_EMA = 0.6;
+const LM_EMA = 0.35;
 function smoothLandmarks(raw, smooth) {
   if (!raw) return null;
   if (!smooth || smooth.length !== raw.length) return raw.map(p => ({ x: p.x, y: p.y, z: p.z }));
@@ -4088,35 +4069,24 @@ function loop() {
       lastVideoTime = video.currentTime;
 
       let handResult = lastHandResult, faceResult = lastFaceResult, poseResult = lastPoseResult;
-      // Hands are gesture-critical: if a hand frame is due, it gets the slot.
-      // Otherwise fill the slot with whichever other enabled model is most
-      // overdue, so faces/body still update whenever hands aren't demanding it.
-      if (toggleHand.checked && modelDue("hand", now)) {
-        handResult = runModel("hand", () => handLandmarker.detectForVideo(video, now), now);
-      } else {
-        let bestKey = null, bestWait = -Infinity;
-        const want = [["face", toggleFace.checked], ["pose", toggleBody.checked]];
-        for (const [key, enabled] of want) {
-          if (enabled && modelDue(key, now)) {
-            const wait = now - modelLastAt[key];
-            if (wait > bestWait) { bestWait = wait; bestKey = key; }
+      // Chromium (Electron) runs the models every N-th new frame, exactly like
+      // the pre-Tauri browser version that worked well. No throttling/priority
+      // games — that was all band-aids for the slow WebKit webview.
+      detectionFrameCounter++;
+      if (detectionFrameCounter % DETECTION_INTERVAL === 0) {
+        handResult = toggleHand.checked ? handLandmarker.detectForVideo(video, now) : null;
+        faceResult = toggleFace.checked ? faceLandmarker.detectForVideo(video, now) : null;
+        poseResult = toggleBody.checked ? poseLandmarker.detectForVideo(video, now) : null;
+        lastHandResult = handResult;
+        lastFaceResult = faceResult;
+        lastPoseResult = poseResult;
+        if (toggleObject.checked && now - lastObjectDetectAt > 350) {
+          if (objectDetector) {
+            objectDetectResult = objectDetector.detectForVideo(video, now).detections;
+            lastObjectDetectAt = now;
+          } else {
+            ensureObjectDetector();
           }
-        }
-        if (bestKey === "face") {
-          faceResult = runModel("face", () => faceLandmarker.detectForVideo(video, now), now);
-        } else if (bestKey === "pose") {
-          poseResult = runModel("pose", () => poseLandmarker.detectForVideo(video, now), now);
-        }
-      }
-      lastHandResult = handResult;
-      lastFaceResult = faceResult;
-      lastPoseResult = poseResult;
-      if (toggleObject.checked && now - lastObjectDetectAt > 500) {
-        if (objectDetector) {
-          objectDetectResult = objectDetector.detectForVideo(video, now).detections;
-          lastObjectDetectAt = now;
-        } else {
-          ensureObjectDetector();
         }
       }
 
@@ -4223,7 +4193,7 @@ function loop() {
           if (i === 0) checkBrightnessPinch(lm, now);
           if (i === 0) checkVolumeGesture(lm, now);
           if (i === 0) checkBrightnessVoiceGesture(lm, now);
-          if (i === 0) checkSwipeSwitchWindow(lm, now);
+          checkPinchSwitchWindow(handResult, i, now);
         });
       } else {
         handSmoothBuffers = [];
@@ -4248,9 +4218,8 @@ function loop() {
         `Hands: <b>${handCount}</b> &nbsp; Face: <b>${faceCount}</b> &nbsp; Body: <b>${poseCount}</b> people &nbsp; FPS: <b>${currentFps}</b>` +
         (toggleASL.checked ? ` &nbsp; ASL: <b>${aslLetter}</b>` : "") +
         (toggleObject.checked ? ` &nbsp; Objects: <b>${objectDetectResult ? objectDetectResult.length : "…"}</b>` : "") +
-        ` &nbsp; ms: hand<b>${Math.round(modelSmoothedMs.hand)}</b> face<b>${Math.round(modelSmoothedMs.face)}</b> pose<b>${Math.round(modelSmoothedMs.pose)}</b>` +
         (delegatesUsed.hand ? ` &nbsp; delegate: <b>${delegatesUsed.hand}</b>` : "");
-      document.getElementById("liveFps").textContent = currentFps;
+    document.getElementById("liveFps").textContent = currentFps;
     }
   } catch (err) {
     // a single bad frame should never kill the whole tracking loop — log it and keep going

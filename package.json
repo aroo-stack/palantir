@@ -1,17 +1,54 @@
 {
   "name": "gesture-tracker-app",
   "version": "1.0.0",
-  "description": "Local Node server for the hand/face/body gesture tracker, with real OS-level brightness control — no Electron, no app bundle, no code signing needed",
-  "main": "server.js",
+  "description": "Gesture Tracker — fully local hand/face/body tracking with gesture control, voice, and OS-level actions. WasmMediaPipe inside Electron, served by a local Node server.",
+  "main": "electron/main.js",
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "tauri": "tauri"
+    "dev": "electron .",
+    "build": "electron-builder --mac",
+    "dist": "electron-builder --mac --dir"
   },
   "dependencies": {
     "brightness": "^3.0.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4"
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.aroo.gesturetracker",
+    "productName": "Gesture Tracker",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "asar": false,
+    "files": [
+      "electron/**/*",
+      "server.js",
+      "index.html",
+      "models/**/*",
+      "vendor/**/*",
+      "build/icon.png",
+      "jarvis_speech",
+      "window_switch",
+      "speech_jarvis.swift",
+      "window_switch.swift",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.icns",
+      "target": [
+        "dir"
+      ],
+      "extendInfo": {
+        "NSCameraUsageDescription": "The camera feed stays on this Mac — used for on-device hand, face and pose tracking.",
+        "NSMicrophoneUsageDescription": "The microphone is used for local voice commands and reminders. Audio never leaves this Mac.",
+        "NSAppleEventsUsageDescription": "Controls system volume, media playback and other apps locally."
+      }
+    }
   }
 }

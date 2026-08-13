@@ -112,12 +112,32 @@ function openApp(appName) {
 // ordered by on-screen window z-order — predictable for a swipe gesture.
 // Delegates to the compiled window_switch helper (CoreGraphics + AppKit), so
 // no System Events / Automation permission is needed.
+//
+// The helper prints "<bundleID> <name>" for the target app. `open -b` then
+// activates it and switches to its Space — without that, activate() from a
+// background process can't leave a fullscreen Space. The helper switches
+// relative to OUR OWN pid (process.ppid = the Electron main process), not
+// NSWorkspace.frontmostApplication, which is unreliable on fullscreen Spaces.
 function switchWindow(direction) {
   const helper = path.join(ROOT, "window_switch");
   return new Promise((resolve, reject) => {
-    execFile(helper, [String(direction)], { timeout: 5000 }, (err) => {
-      if (err) return reject(err);
-      resolve();
+    execFile(helper, [String(direction), String(process.ppid)], { timeout: 5000 }, (err, stdout) => {
+      if (err) {
+        dbg(`switchWindow: helper err ${err.message}`);
+        return reject(err);
+      }
+      const out = String(stdout || "").trim();
+      const bundleId = out.split(/\s+/)[0];
+      dbg(`switchWindow: helper chose bundle=${bundleId || "(none)"} out=${JSON.stringify(out)}`);
+      if (!bundleId) return resolve();
+      execFile("open", ["-b", bundleId], { timeout: 5000 }, (openErr) => {
+        if (openErr) {
+          dbg(`switchWindow: open -b FAILED ${openErr.message}`);
+          return reject(openErr);
+        }
+        dbg(`switchWindow: open -b ok (${bundleId})`);
+        resolve();
+      });
     });
   });
 }
@@ -130,6 +150,19 @@ function lanIPs() {
     }
   }
   return out;
+}
+
+const DEBUG_LOG = path.join(__dirname, "debug.log");
+const DEBUG_LOG_MAX_BYTES = 1024 * 1024; // keep dev diagnostics bounded
+function dbg(msg) {
+  const line = `${new Date().toISOString()} ${msg}\n`;
+  console.log(line.trim());
+  try {
+    if (fs.existsSync(DEBUG_LOG) && fs.statSync(DEBUG_LOG).size > DEBUG_LOG_MAX_BYTES) {
+      fs.writeFileSync(DEBUG_LOG, "[log trimmed]\n"); // cap instead of growing forever
+    }
+    fs.appendFileSync(DEBUG_LOG, line);
+  } catch (e) { /* ignore */ }
 }
 
 function currentTime() {
@@ -196,6 +229,8 @@ let speechLines = [];
 let speechSeq = 0;
 let speechBase = 0; // how many lines have been shifted off the front of speechLines
 let speechError = null;
+let speechStoppedByUs = false; // set when an intentional stop happens, so the async
+                               // "exit" event doesn't report a phantom failure
 
 function compileSpeechBinary() {
   return new Promise((resolve) => {
@@ -229,6 +264,7 @@ function startSpeechProcess() {
     speechSeq = 0;
     speechBase = 0;
     speechError = null;
+    speechStoppedByUs = false;
     let child;
     try {
       child = spawn(JARVIS_BIN, [], { stdio: ["ignore", "pipe", "pipe"] });
@@ -262,7 +298,7 @@ function startSpeechProcess() {
     });
     child.on("exit", () => {
       jarvisProc = null;
-      if (!speechError) speechError = "local speech exited unexpectedly";
+      if (!speechError && !speechStoppedByUs) speechError = "local speech exited unexpectedly";
     });
     // If it dies within a second, it almost certainly can't get permissions.
     setTimeout(() => {
@@ -276,6 +312,7 @@ function startSpeechProcess() {
 }
 
 function stopSpeechProcess() {
+  speechStoppedByUs = true;
   if (jarvisProc) {
     try { jarvisProc.kill(); } catch (e) { /* ignore */ }
     jarvisProc = null;
@@ -525,10 +562,14 @@ function readBody(req, maxBytes = 65536) {
     let body = "";
     let tooBig = false;
     req.on("data", (c) => {
+      if (tooBig) return;
       body += c;
-      if (body.length > maxBytes) { tooBig = true; req.destroy(); }
+      if (body.length > maxBytes) { tooBig = true; reject(new Error("body too large")); }
     });
-    req.on("end", () => tooBig ? reject(new Error("body too large")) : resolve(body));
+    req.on("end", () => {
+      if (tooBig) return; // already rejected
+      resolve(body);
+    });
     req.on("error", reject);
   });
 }
@@ -665,9 +706,12 @@ const server = http.createServer(async (req, res) => {
       const body = JSON.parse(await readBody(req));
       const direction = String(body.direction || "").toLowerCase();
       if (direction !== "next" && direction !== "prev") return sendJson(res, 400, { error: "direction must be 'next' or 'prev'" });
+      dbg(`/api/window POST direction=${direction}`);
       await switchWindow(direction);
+      dbg(`/api/window done direction=${direction}`);
       return sendJson(res, 200, { success: true });
     } catch (e) {
+      dbg(`/api/window ERROR: ${e.message}`);
       return sendJson(res, 500, { error: e.message });
     }
   }
@@ -769,7 +813,8 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === "/") pathname = "/index.html";
   const filePath = path.join(ROOT, pathname);
-  if (!filePath.startsWith(ROOT)) {
+  const rootBoundary = ROOT.endsWith(path.sep) ? ROOT : ROOT + path.sep;
+  if (filePath !== ROOT && !filePath.startsWith(rootBoundary)) {
     res.writeHead(403, { "Content-Type": "text/plain" });
     return res.end("Forbidden");
   }
